@@ -1,12 +1,7 @@
 import { ethers, ignition } from "hardhat";
 import { Signer, Contract, ContractFactory } from "ethers";
 
-type ContractJson = { abi: any; bytecode: string };
-const artifacts: { [name: string]: ContractJson } = {
-    TETHER: require("../../artifacts/contracts/tokens/Tether.sol/Tether.json"),
-    USDC: require("../../artifacts/contracts/tokens/Usdc.sol/Usdc.json"),
-    WBTC: require("../../artifacts/contracts/tokens/WrappedBitcoin.sol/WrappedBitcoin.json"),
-}
+import { artifacts } from "./shared";
 
 import * as fs from 'node:fs/promises';
 

@@ -16,11 +16,7 @@ const NFT_DESCRIPTOR_ADDRESS = process.env.NFT_DESCRIPTOR_ADDRESS;
 const POSITION_DESCRIPTOR_ADDRESS = process.env.POSITION_DESCRIPTOR_ADDRESS;
 const POSITION_MANAGER_ADDRESS = process.env.POSITION_MANAGER_ADDRESS || '';
 
-const artifacts = {
-    UniswapV3Factory: require("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json"),
-    NonfungiblePositionManager: require("@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"),
-    UniswapV3Pool: require("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json"),
-};
+import { artifacts } from "./shared";
 
 BigNumber.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
 
@@ -88,26 +84,26 @@ async function main() {
     await setFeeProtocol(usdtWBTC500);
     console.log("Create pool successfully. usdtWBTC500");
     // USDT/WETH
-    const usdtWETH500 = await deployPool(TETHER_ADDRESS, WETH_ADDRESS, fee, encodePriceSqrt(1, 1));
-    await setFeeProtocol(usdtWETH500);
-    console.log("Create pool successfully. usdtWETH500");
+    // const usdtWETH500 = await deployPool(TETHER_ADDRESS, WETH_ADDRESS, fee, encodePriceSqrt(1, 1));
+    // await setFeeProtocol(usdtWETH500);
+    // console.log("Create pool successfully. usdtWETH500");
     // USDC/WBTC
     const usdcWBTC500 = await deployPool(USDC_ADDRESS, WBTC_ADDRESS, fee, encodePriceSqrt(1, 1));
     await setFeeProtocol(usdcWBTC500);
     console.log("Create pool successfully. usdcWBTC500");
     // USDC/WETH
-    const usdcWETH500 = await deployPool(USDC_ADDRESS, WETH_ADDRESS, fee, encodePriceSqrt(1, 1));
-    await setFeeProtocol(usdcWETH500);
-    console.log("Create pool successfully. usdcWETH500");
+    // const usdcWETH500 = await deployPool(USDC_ADDRESS, WETH_ADDRESS, fee, encodePriceSqrt(1, 1));
+    // await setFeeProtocol(usdcWETH500);
+    // console.log("Create pool successfully. usdcWETH500");
     //
     //
     let addresses = [
         '',
         `USDT_USDC_500=${usdtUsdc500}`,
         `USDT_WBTC_500=${usdtWBTC500}`,
-        `USDT_WETH_500=${usdtWETH500}`,
+        // `USDT_WETH_500=${usdtWETH500}`,
         `USDC_WBTC_500=${usdcWBTC500}`,
-        `USDC_WETH_500=${usdcWETH500}`
+        // `USDC_WETH_500=${usdcWETH500}`
     ];
     //
     const data = addresses.join("\n");

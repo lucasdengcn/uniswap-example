@@ -1,28 +1,18 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { Contract } from "ethers";
+import { Contract, Signer } from "ethers";
 import { ethers } from "hardhat";
 import { Token } from "@uniswap/sdk-core";
 import { Pool, Position, nearestUsableTick } from "@uniswap/v3-sdk";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
-const TETHER_ADDRESS = process.env.TETHER_ADDRESS || '';
-const USDC_ADDRESS = process.env.USDC_ADDRESS || '';
-const WBTC_ADDRESS = process.env.WBTC_ADDRESS || '';
-const WETH_ADDRESS = process.env.WETH_ADDRESS || '';
-const FACTORY_ADDRESS = process.env.FACTORY_ADDRESS || '';
-const SWAP_ROUTER_ADDRESS = process.env.SWAP_ROUTER_ADDRESS;
-const NFT_DESCRIPTOR_ADDRESS = process.env.NFT_DESCRIPTOR_ADDRESS;
-const POSITION_DESCRIPTOR_ADDRESS = process.env.POSITION_DESCRIPTOR_ADDRESS;
 const POSITION_MANAGER_ADDRESS = process.env.POSITION_MANAGER_ADDRESS || '';
 const USDT_USDC_500 = process.env.USDT_USDC_500 || '';
+const USDT_WBTC_500 = process.env.USDT_WBTC_500 || '';
+const USDC_WBTC_500 = process.env.USDC_WBTC_500 || '';
 
-const artifacts = {
-    NonfungiblePositionManager: require("@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"),
-    Usdt: require("../../artifacts/contracts/tokens/Tether.sol/Tether.json"),
-    Usdc: require("../../artifacts/contracts/tokens/Usdc.sol/Usdc.json"),
-    UniswapV3Pool: require("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json"),
-};
+import { artifacts, tokens, TokenJson } from "./shared";
 
 async function getPoolData(poolContract: any) {
     const [tickSpacing, fee, liquidity, slot0, token0, token1, maxLiquidityPerTick] = await Promise.all([
@@ -62,25 +52,28 @@ async function getPoolState(poolContract: any) {
     }
 }
 
-async function main() {
-    const [owner, signer] = await ethers.getSigners();
-    const provider = ethers.provider;
+async function poolLiquidityParams(
+    signer: HardhatEthersSigner,
+    token0: TokenJson,
+    token1: TokenJson,
+    poolAddress: string
+) {
     // token contract
-    const usdtContract: any = new Contract(TETHER_ADDRESS, artifacts.Usdt.abi, provider);
-    const usdcContract: any = new Contract(USDC_ADDRESS, artifacts.Usdc.abi, provider);
+    const usdtContract: any = new Contract(token0.address, token0.abi, ethers.provider);
+    const usdcContract: any = new Contract(token1.address, token1.abi, ethers.provider);
     // token allowance to positionManager
     await usdtContract.connect(signer).approve(POSITION_MANAGER_ADDRESS, ethers.parseEther('100000'));
     await usdcContract.connect(signer).approve(POSITION_MANAGER_ADDRESS, ethers.parseEther('100000'));
     // Uniswap pool contract
-    const poolContract = new Contract(USDT_USDC_500, artifacts.UniswapV3Pool.abi, provider);
+    const poolContract = new Contract(poolAddress, artifacts.UniswapV3Pool.abi, ethers.provider);
     // show pool information
     const poolData = await getPoolData(poolContract);
     console.log('Pool Data', poolData);
     const poolState = await getPoolState(poolContract);
     console.log('Pool state: ', poolState);
     // create uniswap token
-    const UsdtToken = new Token(31337, TETHER_ADDRESS, 18, 'USDT', 'Tether');
-    const UsdcToken = new Token(31337, USDC_ADDRESS, 18, 'USDC', 'Usdc');
+    const UsdtToken = new Token(31337, token0.address, 18, token0.symbol, token0.name);
+    const UsdcToken = new Token(31337, token1.address, 18, token1.symbol, token1.name);
 
     // prepare uniswap mint params
     // invariant(Number.isInteger(fee) && fee < 1_000_000, 'FEE')
@@ -101,8 +94,8 @@ async function main() {
     const { amount0: amount0Desired, amount1: amount1Desired } = position.mintAmounts;
 
     const params = {
-        token0: TETHER_ADDRESS,
-        token1: USDC_ADDRESS,
+        token0: token0.address,
+        token1: token1.address,
         fee: poolData.fee,
         tickLower: nearestUsableTick(poolData.tick, poolData.tickSpacing) - poolData.tickSpacing * 2,
         tickUpper: nearestUsableTick(poolData.tick, poolData.tickSpacing) + poolData.tickSpacing * 2,
@@ -116,13 +109,35 @@ async function main() {
 
     console.log(params);
 
+    return params;
+}
+
+async function main() {
+    const [owner, signer] = await ethers.getSigners();
+    //
+    //
     const nonfungiblePositionManager: any = new Contract(
         POSITION_MANAGER_ADDRESS,
         artifacts.NonfungiblePositionManager.abi,
-        provider
+        ethers.provider
     );
-
-    const tx = await nonfungiblePositionManager.connect(signer).mint(
+    //
+    let params = await poolLiquidityParams(signer, tokens.USDT, tokens.USDC, USDT_USDC_500);
+    let tx = await nonfungiblePositionManager.connect(signer).mint(
+        params,
+        { gasLimit: '1000000' }
+    );
+    await tx.wait();
+    //
+    params = await poolLiquidityParams(signer, tokens.USDT, tokens.WBTC, USDT_WBTC_500);
+    tx = await nonfungiblePositionManager.connect(signer).mint(
+        params,
+        { gasLimit: '1000000' }
+    );
+    await tx.wait();
+    //
+    params = await poolLiquidityParams(signer, tokens.USDC, tokens.WBTC, USDC_WBTC_500);
+    tx = await nonfungiblePositionManager.connect(signer).mint(
         params,
         { gasLimit: '1000000' }
     );

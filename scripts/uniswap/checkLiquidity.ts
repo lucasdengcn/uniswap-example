@@ -17,12 +17,7 @@ const POSITION_DESCRIPTOR_ADDRESS = process.env.POSITION_DESCRIPTOR_ADDRESS;
 const POSITION_MANAGER_ADDRESS = process.env.POSITION_MANAGER_ADDRESS || '';
 const USDT_USDC_500 = process.env.USDT_USDC_500 || '';
 
-const artifacts = {
-    NonfungiblePositionManager: require("@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json"),
-    Usdt: require("../../artifacts/contracts/tokens/Tether.sol/Tether.json"),
-    Usdc: require("../../artifacts/contracts/tokens/Usdc.sol/Usdc.json"),
-    UniswapV3Pool: require("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json"),
-};
+import { artifacts } from "./shared";
 
 async function getPoolData(poolContract: any) {
     const [tickSpacing, fee, liquidity, slot0, token0, token1, maxLiquidityPerTick] = await Promise.all([
