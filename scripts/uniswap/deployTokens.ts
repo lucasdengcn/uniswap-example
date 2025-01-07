@@ -1,10 +1,6 @@
 import { ethers, ignition } from "hardhat";
 import { Signer, Contract, ContractFactory } from "ethers";
 
-import TetherModule from "../../ignition/modules/TetherModule";
-import UsdcModule from "../../ignition/modules/UsdcModule";
-import WrappedBitcoinModule from "../../ignition/modules/WrappedBitcoinModule";
-
 type ContractJson = { abi: any; bytecode: string };
 const artifacts: { [name: string]: ContractJson } = {
     TETHER: require("../../artifacts/contracts/tokens/Tether.sol/Tether.json"),

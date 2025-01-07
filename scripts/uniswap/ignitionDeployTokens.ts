@@ -13,17 +13,16 @@ async function main() {
     console.log('signer: ', await signer.getAddress());
     // deplly tokens
     const { tether } = await ignition.deploy(TetherModule);
+    await tether.waitForDeployment(); // NEED this, otherwise the getAddress will return wrong address.
     const tetherAddress = await tether.getAddress();
-    // const owner = await tether.owner();
-    // if (signer == owner) {
-    //     console.log("Deploy Tether token success. ");
-    // }
     //
     const { usdc } = await ignition.deploy(UsdcModule);
+    await usdc.waitForDeployment();
     const usdcAddress = await usdc.getAddress();
     console.log("Deploy USDC token success. ");
     //
     const { wrappedBitcoin } = await ignition.deploy(WrappedBitcoinModule);
+    await wrappedBitcoin.waitForDeployment();
     const wrappedBitcoinAddress = await wrappedBitcoin.getAddress();
     console.log("Deploy WBTC token success. ");
     //
