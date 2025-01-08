@@ -16,6 +16,14 @@ contract SingleSwapExample {
         swapRouter = _swapRouter;
     }
 
+    event SwapResult(
+        address indexed receipt,
+        address indexed tokenIn,
+        address indexed tokenOut,
+        uint256 amountIn,
+        uint256 amountOut
+    );
+
     //
     function swapExactInputSingle(
         address tokenIn,
@@ -47,6 +55,8 @@ contract SingleSwapExample {
             });
         //
         amountOut = ISwapRouter(swapRouter).exactInputSingle(params);
+        //
+        emit SwapResult(msg.sender, tokenIn, tokenOut, amountIn, amountOut);
     }
 
     //
@@ -81,7 +91,8 @@ contract SingleSwapExample {
             });
         //
         amountIn = ISwapRouter(swapRouter).exactOutputSingle(params);
-        console.log("exactOutput: ", amountIn);
+        console.log("exactAmountIn: ", amountIn);
+        emit SwapResult(msg.sender, tokenIn, tokenOut, amountIn, amountOut);
         //
         if (amountIn < amountInMax) {
             // token, to, amount
@@ -118,9 +129,6 @@ contract SingleSwapExample {
         console.log("safeTransferFrom");
         // Approve the router to spend DAI.
         TransferHelper.safeApprove(tokenIn, swapRouter, amountIn);
-        TransferHelper.safeApprove(token2, swapRouter, amountIn);
-        TransferHelper.safeApprove(tokenOut, swapRouter, amountIn);
-
         console.log("safeApprove");
 
         // Multiple pool swaps are encoded through bytes called a `path`. A path is a sequence of token addresses and poolFees that define the pools used in the swaps.
@@ -138,11 +146,12 @@ contract SingleSwapExample {
                 recipient: msg.sender,
                 deadline: block.timestamp,
                 amountIn: amountIn,
-                amountOutMinimum: 1
+                amountOutMinimum: 0
             });
 
         // Executes the swap.
         amountOut = ISwapRouter(swapRouter).exactInput(params);
+        emit SwapResult(msg.sender, tokenIn, tokenOut, amountIn, amountOut);
     }
 
     /// @notice swapExactOutputMultihop swaps a minimum possible amount of DAI for a fixed amount of WETH through an intermediary pool.
@@ -192,19 +201,20 @@ contract SingleSwapExample {
 
         // Executes the swap, returning the amountIn actually spent.
         amountIn = ISwapRouter(swapRouter).exactOutput(params);
-        console.log("exactOutput");
+        console.log("exactAmountIn: ", amountIn);
+        emit SwapResult(msg.sender, tokenIn, tokenOut, amountIn, amountOut);
 
-        // If the swap did not require the full amountInMaximum to achieve the exact amountOut then we refund msg.sender and approve the router to spend 0.
+        // If the swap did not require the full amountInMaximum to achieve the exact amountOut
+        // then we refund msg.sender and approve the router to spend 0.
         if (amountIn < amountInMaximum) {
             TransferHelper.safeApprove(tokenIn, swapRouter, 0);
             console.log("safeApprove1");
-            TransferHelper.safeTransferFrom(
+            TransferHelper.safeTransfer(
                 tokenIn,
-                address(this),
                 msg.sender,
                 amountInMaximum - amountIn
             );
-            console.log("safeTransferFrom1");
+            console.log("safeTransfer1");
         }
     }
 }
