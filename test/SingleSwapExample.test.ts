@@ -1,5 +1,5 @@
 import * as dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ path: '.address.env' });
 
 const TETHER_ADDRESS = process.env.TETHER_ADDRESS || '';
 const USDC_ADDRESS = process.env.USDC_ADDRESS || '';
@@ -19,12 +19,12 @@ import SingleSwapExampleModule from "../ignition/modules/SingleSwapExampleModule
 import WETH9 from "../scripts/uniswap/WETH9.json";
 import UniswapV3Pool from "@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json"
 
-function sqrtToPrice(sqrt: any) {
-    const numerator = sqrt ** 2
+function sqrtToPrice(sqrtPriceX96: any) {
+    const numerator = sqrtPriceX96 ** 2
     const denominator = 2 ** 192
     let ratio = numerator / denominator
-    const decimalShift = Math.pow(10, -12)
-    ratio = ratio * decimalShift
+    const decimalShift = Math.pow(10, 12)
+    ratio = decimalShift / ratio;
     return ratio
 }
 

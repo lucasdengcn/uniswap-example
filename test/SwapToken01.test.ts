@@ -1,5 +1,5 @@
 import * as dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ path: '.address.env' });
 
 const TETHER_ADDRESS = process.env.TETHER_ADDRESS || '';
 const USDC_ADDRESS = process.env.USDC_ADDRESS || '';
@@ -26,17 +26,47 @@ import { TickMath } from "@uniswap/v3-sdk";
 import BigNumber from "bignumber.js";
 
 async function getPoolData(poolContract: any) {
-    const [token0, token1, fee] = await Promise.all([
+    const [tickSpacing, fee, liquidity, slot0, token0, token1, maxLiquidityPerTick] = await Promise.all([
+        poolContract.tickSpacing(),
+        poolContract.fee(),
+        poolContract.liquidity(),
+        poolContract.slot0(),
         poolContract.token0(),
         poolContract.token1(),
-        poolContract.fee(),
+        poolContract.maxLiquidityPerTick(),
     ])
+
     return {
+        tickSpacing: parseInt(tickSpacing),
+        fee: parseInt(fee),
+        liquidity: liquidity,
+        sqrtPriceX96: slot0[0],
+        tick: parseInt(slot0[1]),
         token0: token0,
         token1: token1,
-        fee: fee,
+        maxLiquidityPerTick: maxLiquidityPerTick,
+        locked: slot0[6],
+        feeProtocol: slot0[5],
     }
 }
+
+/**
+ * 
+ * @param sqrtPriceX96 
+ * @param decimals 
+ * @returns 
+ */
+function sqrtToPrice(sqrtPriceX96: any, decimals: number = 0) {
+    const numerator = sqrtPriceX96 ** 2
+    const denominator = 2 ** 192
+    let ratio = numerator / denominator
+    //
+    const decimalShift = Math.pow(10, decimals)
+    ratio = decimalShift / ratio;
+    //
+    return ratio
+}
+
 
 describe("SwapToken01", function () {
     //

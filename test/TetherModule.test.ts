@@ -1,5 +1,5 @@
 import * as dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ path: '.address.env' });
 
 const TETHER_ADDRESS = process.env.TETHER_ADDRESS || '';
 const USDC_ADDRESS = process.env.USDC_ADDRESS || '';

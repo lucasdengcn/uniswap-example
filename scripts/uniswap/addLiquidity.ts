@@ -33,7 +33,9 @@ async function getPoolData(poolContract: any) {
         tick: parseInt(slot0[1]),
         token0: token0,
         token1: token1,
-        maxLiquidityPerTick: maxLiquidityPerTick
+        maxLiquidityPerTick: maxLiquidityPerTick,
+        locked: slot0[6],
+        feeProtocol: slot0[5],
     }
 }
 
@@ -69,12 +71,9 @@ async function poolLiquidityParams(
     // show pool information
     const poolData = await getPoolData(poolContract);
     console.log('Pool Data', poolData);
-    const poolState = await getPoolState(poolContract);
-    console.log('Pool state: ', poolState);
     // create uniswap token
     const UsdtToken = new Token(31337, token0.address, 18, token0.symbol, token0.name);
     const UsdcToken = new Token(31337, token1.address, 18, token1.symbol, token1.name);
-
     // prepare uniswap mint params
     // invariant(Number.isInteger(fee) && fee < 1_000_000, 'FEE')
     const pool = new Pool(
@@ -85,20 +84,30 @@ async function poolLiquidityParams(
         poolData.liquidity.toString(),
         poolData.tick
     );
+    // 
+    const roundTick = nearestUsableTick(poolData.tick, poolData.tickSpacing);
+    const tickLower = roundTick - poolData.tickSpacing * 2;
+    const tickUpper = roundTick + poolData.tickSpacing * 2;
+    //
     const position = new Position({
         pool: pool,
         liquidity: ethers.parseEther('100000').toString(),
-        tickLower: nearestUsableTick(poolData.tick, poolData.tickSpacing) - poolData.tickSpacing * 2,
-        tickUpper: nearestUsableTick(poolData.tick, poolData.tickSpacing) + poolData.tickSpacing * 2,
+        tickLower: tickLower,
+        tickUpper: tickUpper,
     });
     const { amount0: amount0Desired, amount1: amount1Desired } = position.mintAmounts;
-
+    //
+    // amount0Min and amount1Min to zero for the example - but this would be a vulnerability in production. 
+    // A function calling mint with no slippage protection would be vulnerable to a frontrunning attack 
+    // designed to execute the mint call at an inaccurate price.
+    // TODO: For a more secure practice the developer would need to implement a slippage estimation process.
+    //
     const params = {
         token0: token0.address,
         token1: token1.address,
         fee: poolData.fee,
-        tickLower: nearestUsableTick(poolData.tick, poolData.tickSpacing) - poolData.tickSpacing * 2,
-        tickUpper: nearestUsableTick(poolData.tick, poolData.tickSpacing) + poolData.tickSpacing * 2,
+        tickLower: tickLower,
+        tickUpper: tickUpper,
         amount0Desired: amount0Desired.toString(),
         amount1Desired: amount1Desired.toString(),
         amount0Min: 0,
@@ -115,7 +124,6 @@ async function poolLiquidityParams(
 async function main() {
     const [owner, signer] = await ethers.getSigners();
     //
-    //
     const nonfungiblePositionManager: any = new Contract(
         POSITION_MANAGER_ADDRESS,
         artifacts.NonfungiblePositionManager.abi,
@@ -127,7 +135,10 @@ async function main() {
         params,
         { gasLimit: '1000000' }
     );
-    await tx.wait();
+    let receipt = await tx.wait();
+    // need to extract response: tokenId, liquidity, amount0, amoun1
+    console.log(receipt);
+
     //
     params = await poolLiquidityParams(signer, tokens.USDT, tokens.WBTC, USDT_WBTC_500);
     tx = await nonfungiblePositionManager.connect(signer).mint(

@@ -35,7 +35,7 @@ async function main() {
     const data = addresses.join("\n");
     console.log(addresses);
 
-    return fs.appendFile(".env", data);
+    return fs.appendFile(".address.env", data);
 }
 
 /**

@@ -147,7 +147,7 @@ async function main() {
     const data = addresses.join("\n");
     console.log(addresses);
 
-    return fs.writeFile(".env", data);
+    return fs.writeFile(".address.env", data);
 }
 
 /**
