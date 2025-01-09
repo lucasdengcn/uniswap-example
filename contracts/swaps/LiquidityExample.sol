@@ -100,6 +100,11 @@ contract LiquidityExample is IERC721Receiver {
     deposits[tokenId] = Deposit({ owner: owner, liquidity: liquidity });
   }
 
+  // populate liquidity
+  function deposit(uint256 tokenId) external {
+    _createDeposit(msg.sender, tokenId);
+  }
+
   // calculateRoundedTick to find the nearest tick
   function calculateRoundedTick(int24 tick, int24 tickSpacing) public pure returns (int24) {
     int24 rounded = (tick / tickSpacing) * tickSpacing;
@@ -204,7 +209,7 @@ contract LiquidityExample is IERC721Receiver {
       amount1Desired: amount1Desired,
       amount0Min: 0,
       amount1Min: 0,
-      recipient: address(this), //
+      recipient: address(this), // NFT owner
       deadline: block.timestamp
     });
     // tokenId is important to check position later.
@@ -214,6 +219,7 @@ contract LiquidityExample is IERC721Receiver {
     emit MintPosition(requestId, tokenId, poolAddress, msg.sender, liquidityNew, amount0, amount1);
     //
     requestTokenIds[requestId] = tokenId;
+    // owner is to caller
     _createDeposit(msg.sender, tokenId);
     //
     if (amount0 < amount0Desired) {
@@ -231,19 +237,31 @@ contract LiquidityExample is IERC721Receiver {
   // current holding amounts of token0, token1.
   function currentHoldings(
     uint128 tokenId
-  ) external view returns (uint256 amount0, uint256 amount1, uint160 sqrtRatioX96, uint128 liquidity) {
+  )
+    external
+    view
+    returns (
+      uint256 amount0,
+      uint256 amount1,
+      uint160 sqrtRatioX96,
+      uint128 liquidity,
+      int24 tickLower,
+      int24 tickUpper,
+      uint128 tokensOwed0,
+      uint128 tokensOwed1
+    )
+  {
     INonfungiblePositionManager nft = INonfungiblePositionManager(positionManager);
     // (uint96 nonce, address operator, address token0, address token1, uint24 fee,
     // int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128,
     // uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)
-    (, , , , , int24 tickLower, int24 tickUpper, uint128 liquidity0, , , , ) = nft.positions(tokenId);
+    (, , , , , tickLower, tickUpper, liquidity, , , tokensOwed0, tokensOwed1) = nft.positions(tokenId);
     //
     IUniswapV3Pool poolContract = IUniswapV3Pool(poolAddress);
     (sqrtRatioX96, , , , , , ) = poolContract.slot0();
     //
     uint160 sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(tickLower);
     uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(tickUpper);
-    liquidity = liquidity0;
     //
     (amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(sqrtRatioX96, sqrtRatioAX96, sqrtRatioBX96, liquidity);
   }
@@ -257,13 +275,14 @@ contract LiquidityExample is IERC721Receiver {
     string calldata requestId,
     uint256 tokenId
   ) external returns (uint256 amount0, uint256 amount1) {
-    require(deposits[tokenId].owner != address(0), 'TokenId not found');
+    // require(deposits[tokenId].owner != address(0), 'TokenId not found');
     // caller must be the owner of the NFT
-    require(msg.sender == deposits[tokenId].owner, 'Not the owner');
+    // require(msg.sender == deposits[tokenId].owner, 'Not the owner');
     // Caller must own the ERC721 position
     // Call to safeTransfer will trigger `onERC721Received` which must return the selector else transfer will fail
-    INonfungiblePositionManager(positionManager).safeTransferFrom(msg.sender, address(this), tokenId);
 
+    INonfungiblePositionManager nfpm = INonfungiblePositionManager(positionManager);
+    nfpm.approve(msg.sender, tokenId);
     // set amount0Max and amount1Max to uint256.max to collect all fees
     // alternatively can set recipient to msg.sender and avoid another transaction in `sendToOwner`
     INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager.CollectParams({
@@ -273,7 +292,7 @@ contract LiquidityExample is IERC721Receiver {
       amount1Max: type(uint128).max
     });
 
-    (amount0, amount1) = INonfungiblePositionManager(positionManager).collect(params);
+    (amount0, amount1) = nfpm.collect(params);
 
     // send collected feed back to owner
     _sendToOwner(tokenId, amount0, amount1);

@@ -336,4 +336,39 @@ describe('LiquidityExample', function () {
       );
     });
   });
+
+  describe('Collect fees', function () {
+    it('Should collect fees success', async function () {
+      const [deployer, tokenOwner] = await ethers.getSigners();
+      const requestId = randomHexString(16);
+      const callerAddress = await example.getAddress();
+      const ownerAddress = await tokenOwner.getAddress();
+      tokenId = 10;
+      console.log(callerAddress);
+      console.log('tokenId: ', tokenId);
+      const holdingsBefore = await example.connect(tokenOwner).currentHoldings(tokenId);
+      console.log(
+        'Before Collect: ',
+        ethers.formatEther(holdingsBefore[0]),
+        ethers.formatEther(holdingsBefore[1]),
+        holdingsBefore[4],
+        holdingsBefore[5],
+        ethers.formatEther(holdingsBefore[6]),
+        ethers.formatEther(holdingsBefore[7])
+      );
+      //
+      await expect(example.connect(tokenOwner).collectAllFees(requestId, tokenId)).to.emit(example, 'CollectFee');
+      //
+      const holdingsAfter = await example.connect(tokenOwner).currentHoldings(tokenId);
+      console.log(
+        'After Collect: ',
+        ethers.formatEther(holdingsAfter[0]),
+        ethers.formatEther(holdingsAfter[1]),
+        holdingsBefore[4],
+        holdingsBefore[5],
+        ethers.formatEther(holdingsAfter[6]),
+        ethers.formatEther(holdingsAfter[7])
+      );
+    });
+  });
 });
