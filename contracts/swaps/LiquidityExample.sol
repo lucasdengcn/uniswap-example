@@ -117,7 +117,7 @@ contract LiquidityExample is IERC721Receiver {
     int24 tick,
     int24 tickSpacing,
     int24 tickOffset
-  ) public pure returns (int24 tickLower, int24 tickUpper) {
+  ) internal pure returns (int24 tickLower, int24 tickUpper) {
     int24 roundedTick = calculateRoundedTick(tick, tickSpacing);
     tickLower = roundedTick - tickOffset * tickSpacing;
     tickUpper = roundedTick + tickOffset * tickSpacing;
@@ -231,18 +231,19 @@ contract LiquidityExample is IERC721Receiver {
   // current holding amounts of token0, token1.
   function currentHoldings(
     uint128 tokenId
-  ) external view returns (uint256 amount0, uint256 amount1, uint160 sqrtRatioX96) {
+  ) external view returns (uint256 amount0, uint256 amount1, uint160 sqrtRatioX96, uint128 liquidity) {
     INonfungiblePositionManager nft = INonfungiblePositionManager(positionManager);
     // (uint96 nonce, address operator, address token0, address token1, uint24 fee,
     // int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128,
     // uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)
-    (, , , , , int24 tickLower, int24 tickUpper, uint128 liquidity, , , , ) = nft.positions(tokenId);
+    (, , , , , int24 tickLower, int24 tickUpper, uint128 liquidity0, , , , ) = nft.positions(tokenId);
     //
     IUniswapV3Pool poolContract = IUniswapV3Pool(poolAddress);
     (sqrtRatioX96, , , , , , ) = poolContract.slot0();
     //
     uint160 sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(tickLower);
     uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(tickUpper);
+    liquidity = liquidity0;
     //
     (amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(sqrtRatioX96, sqrtRatioAX96, sqrtRatioBX96, liquidity);
   }
@@ -293,6 +294,37 @@ contract LiquidityExample is IERC721Receiver {
     //
   }
 
+  // estimateDescreaseLiquidity to get correct amount0Min, amount1Min
+  // for slippage protection
+  function estimateDescreaseLiquidity(
+    uint256 tokenId,
+    uint24 percentage,
+    uint128 change
+  ) external view returns (uint256 amount0Min, uint256 amount1Min, uint128 liquidityToChange) {
+    require(deposits[tokenId].owner != address(0), 'TokenId not found');
+    // caller must be the owner of the NFT
+    require(msg.sender == deposits[tokenId].owner, 'Not the owner');
+    // get liquidity data for tokenId
+    uint128 _liquidityToChange = change;
+    if (percentage > 0) {
+      uint128 liquidity = deposits[tokenId].liquidity;
+      _liquidityToChange = uint128(FullMath.mulDiv(uint256(liquidity), uint256(percentage), 100));
+    }
+    //
+    INonfungiblePositionManager nfpm = INonfungiblePositionManager(positionManager);
+    //
+    (uint160 sqrtRatioX96, , , , , , ) = IUniswapV3Pool(poolAddress).slot0();
+    (, , , , , int24 lowerTick, int24 upperTick, , , , , ) = nfpm.positions(tokenId);
+    //estimate amounts on current spot price
+    (amount0Min, amount1Min) = LiquidityAmounts.getAmountsForLiquidity(
+      sqrtRatioX96,
+      TickMath.getSqrtRatioAtTick(lowerTick),
+      TickMath.getSqrtRatioAtTick(upperTick),
+      _liquidityToChange
+    );
+    liquidityToChange = _liquidityToChange;
+  }
+
   /// @notice A function that decreases the current liquidity by percentage or change amount.
   /// @param tokenId The id of the erc721 token
   /// @return amount0 The amount received back in token0
@@ -300,39 +332,34 @@ contract LiquidityExample is IERC721Receiver {
   function decreaseLiquidity(
     string calldata requestId,
     uint256 tokenId,
-    uint24 percentage,
-    uint128 change
+    uint256 amount0Min,
+    uint256 amount1Min,
+    uint128 liquidityToChange
   ) external returns (uint256 amount0, uint256 amount1) {
     require(deposits[tokenId].owner != address(0), 'TokenId not found');
     // caller must be the owner of the NFT
     require(msg.sender == deposits[tokenId].owner, 'Not the owner');
-    // get liquidity data for tokenId
-    uint128 liquidityToChange = change;
-    if (percentage > 0) {
-      uint128 liquidity = deposits[tokenId].liquidity;
-      liquidityToChange = uint128(FullMath.mulDiv(uint256(liquidity), uint256(percentage), 100));
-    }
-
+    //
+    INonfungiblePositionManager nfpm = INonfungiblePositionManager(positionManager);
     // amount0Min and amount1Min are price slippage checks
     // if the amount received after burning is not greater than these minimums, transaction will fail
     INonfungiblePositionManager.DecreaseLiquidityParams memory params = INonfungiblePositionManager
       .DecreaseLiquidityParams({
         tokenId: tokenId,
         liquidity: liquidityToChange,
-        amount0Min: 0,
-        amount1Min: 0,
+        amount0Min: amount0Min,
+        amount1Min: amount1Min,
         deadline: block.timestamp
       });
 
-    INonfungiblePositionManager nfpm = INonfungiblePositionManager(positionManager);
     (amount0, amount1) = nfpm.decreaseLiquidity(params);
     // Collect the decreased liquidity to trigger the real transfer from Pool to recipient.
     nfpm.collect(
       INonfungiblePositionManager.CollectParams({
         tokenId: tokenId,
         recipient: address(this),
-        amount0Max: type(uint128).max,
-        amount1Max: type(uint128).max
+        amount0Max: uint128(amount0),
+        amount1Max: uint128(amount1)
       })
     );
     //send liquidity back to owner

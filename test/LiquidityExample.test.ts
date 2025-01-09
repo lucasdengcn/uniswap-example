@@ -255,10 +255,12 @@ describe('LiquidityExample', function () {
       await printOutBalance(tether, callerAddress, 'DA-before', 'USDT');
       await printOutBalance(usdc, callerAddress, 'DA-before', 'USDC');
       //
-      await expect(example.connect(tokenOwner).decreaseLiquidity(requestId, tokenId, 10, 0)).to.emit(
-        example,
-        'DecreaseLiquidity'
-      );
+      const estimation = await example.connect(tokenOwner).estimateDescreaseLiquidity(tokenId, 10, 0);
+      console.log(estimation);
+      //
+      await expect(
+        example.connect(tokenOwner).decreaseLiquidity(requestId, tokenId, estimation[0], estimation[1], estimation[2])
+      ).to.emit(example, 'DecreaseLiquidity');
       //
       await printOutBalance(tether, ownerAddress, 'Owner-after', 'USDT');
       await printOutBalance(usdc, ownerAddress, 'Owner-after', 'USDC');
@@ -320,7 +322,7 @@ describe('LiquidityExample', function () {
       const [deployer, tokenOwner] = await ethers.getSigners();
       const requestId = randomHexString(16);
 
-      await expect(example.connect(tokenOwner).decreaseLiquidity(requestId, 19, 10, 0)).to.revertedWith(
+      await expect(example.connect(tokenOwner).decreaseLiquidity(requestId, 19, 10, 0, 0)).to.revertedWith(
         'TokenId not found'
       );
     });
@@ -329,7 +331,7 @@ describe('LiquidityExample', function () {
       const [deployer, tokenOwner] = await ethers.getSigners();
       const requestId = randomHexString(16);
 
-      await expect(example.connect(deployer).decreaseLiquidity(requestId, tokenId, 10, 0)).to.revertedWith(
+      await expect(example.connect(deployer).decreaseLiquidity(requestId, tokenId, 10, 0, 0)).to.revertedWith(
         'Not the owner'
       );
     });

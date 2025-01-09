@@ -22,7 +22,8 @@ npx hardhat ignition deploy ./ignition/modules/Lock.ts
 - Multi Swap ExactIn
 - Multi Swap ExactOut
 - Collect Fee
-- Estimate new liquidity at current spot price and tickSpacing
+- Estimate new liquidity at current spot price
+- Estimate decrease liquidity at current spot price
 
 ## Deployment
 
