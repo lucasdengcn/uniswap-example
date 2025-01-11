@@ -2,11 +2,14 @@
 pragma solidity =0.7.6;
 pragma abicoder v2;
 
+import 'hardhat/console.sol';
+
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 import '@uniswap/v3-core/contracts/libraries/FullMath.sol';
 import '@uniswap/v3-core/contracts/libraries/SqrtPriceMath.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
+import '@uniswap/v3-core/contracts/libraries/LowGasSafeMath.sol';
 
 import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
@@ -14,6 +17,8 @@ import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.s
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/base/LiquidityManagement.sol';
 import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
+
+import '../MathUtils.sol';
 
 contract LiquidityExample is IERC721Receiver {
   // states
@@ -98,6 +103,8 @@ contract LiquidityExample is IERC721Receiver {
     INonfungiblePositionManager nft = INonfungiblePositionManager(positionManager);
     (, , , , , , , uint128 liquidity, , , , ) = nft.positions(tokenId);
     deposits[tokenId] = Deposit({ owner: owner, liquidity: liquidity });
+    //
+    console.log('_createDeposit: ', owner, tokenId);
   }
 
   // populate liquidity
@@ -179,6 +186,13 @@ contract LiquidityExample is IERC721Receiver {
     (amount0Desired, amount1Desired) = _mintAmounts(tickCurrent, tickLower, tickUpper, sqrtRatioX96, liquidityCurrent);
   }
 
+  function estimateAmountGivenPriceRange(
+    uint128 priceLower,
+    uint128 priceUpper
+  ) external returns (uint256 amount0, uint256 amount1) {
+    // given human price term as token0/token1, Uniswap sqrtPriceX96 is on token1/token0
+  }
+
   // external functions
   // mintNewPosition to mint new position for token pair and add liqudity
   function mintNewPosition(
@@ -248,17 +262,21 @@ contract LiquidityExample is IERC721Receiver {
       int24 tickLower,
       int24 tickUpper,
       uint128 tokensOwed0,
-      uint128 tokensOwed1
+      uint128 tokensOwed1,
+      uint24 fee,
+      int24 tickCurrent,
+      address tokenX0,
+      address tokenY1
     )
   {
     INonfungiblePositionManager nft = INonfungiblePositionManager(positionManager);
     // (uint96 nonce, address operator, address token0, address token1, uint24 fee,
     // int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128,
     // uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)
-    (, , , , , tickLower, tickUpper, liquidity, , , tokensOwed0, tokensOwed1) = nft.positions(tokenId);
+    (, , tokenX0, tokenY1, fee, tickLower, tickUpper, liquidity, , , tokensOwed0, tokensOwed1) = nft.positions(tokenId);
     //
     IUniswapV3Pool poolContract = IUniswapV3Pool(poolAddress);
-    (sqrtRatioX96, , , , , , ) = poolContract.slot0();
+    (sqrtRatioX96, tickCurrent, , , , , ) = poolContract.slot0();
     //
     uint160 sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(tickLower);
     uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(tickUpper);
