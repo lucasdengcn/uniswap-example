@@ -128,11 +128,10 @@ describe('LiquidityExample', function () {
   describe('Minting', function () {
     //
     it('USDT_USDC should estimate NewPosition success', async function () {
-      const estimation = await example.estimateNewPosition(1);
+      const estimation = await example.estimateNewPosition(1, 5);
       //
       console.log('amount0: ', ethers.formatEther(estimation[1]));
       console.log('amount1: ', ethers.formatEther(estimation[2]));
-      console.log('current USDT/USDC price: ', sqrtToPrice(estimation[4], 0));
     });
 
     it('USDT_USDC should mint new position success', async function () {
@@ -140,11 +139,11 @@ describe('LiquidityExample', function () {
       const callerAddress = await example.getAddress();
       //
       const requestId = randomHexString(16);
-      const estimation = await example.connect(tokenOwner).estimateNewPosition(1);
+      // add more 5% liquidity
+      const estimation = await example.connect(tokenOwner).estimateNewPosition(1, 5);
       //
       console.log('estimate amount0: ', ethers.formatEther(estimation[0]));
       console.log('estimate amount1: ', ethers.formatEther(estimation[1]));
-      console.log('current USDT/USDC price: ', sqrtToPrice(estimation[4], 0));
       //
       const tether: any = await getUSDT();
       const usdc: any = await getUSDC();
@@ -159,9 +158,15 @@ describe('LiquidityExample', function () {
       await printOutBalance(usdc, USDT_USDC_500, 'Pool-before', 'USDC');
       //
       // execute transaction
-      const tx = await example
-        .connect(tokenOwner)
-        .mintNewPosition(requestId, estimation[0], estimation[1], estimation[2], estimation[3]);
+      const tx = await example.connect(tokenOwner).mintNewPosition({
+        requestId,
+        amount0Desired: estimation[0],
+        amount1Desired: estimation[1],
+        tickLower: estimation[2],
+        tickUpper: estimation[3],
+        amount0Min: estimation[4],
+        amount1Min: estimation[5],
+      });
       expect(tx).to.emit(example, 'MintPosition');
       //
       tokenId = await example.requestTokenIds(requestId);
@@ -187,16 +192,21 @@ describe('LiquidityExample', function () {
   describe('Liquidity increase', function () {
     it('Should increase liquidity success given valid tokenId', async function () {
       const [deployer, tokenOwner] = await ethers.getSigners();
-      const amount0 = ethers.parseEther('1');
-      const amount1 = ethers.parseEther('1');
       const requestId = randomHexString(16);
       console.log('requestId: ', requestId, 'tokenId: ', tokenId);
       //
       const holdingsBefore = await example.connect(tokenOwner).currentHoldings(tokenId);
       console.log('Before Increase: ', ethers.formatEther(holdingsBefore[0]), ethers.formatEther(holdingsBefore[1]));
       //
+      // 10 changges change
+      const estimation = await example.connect(tokenOwner).estimateLiquidityChanges(tokenId, 10);
+      console.log(estimation);
+      //
+      const tolerance = 5;
       await expect(
-        example.connect(tokenOwner).increaseLiquidityCurrentRange(requestId, tokenId, amount0, amount1)
+        example
+          .connect(tokenOwner)
+          .increaseLiquidityCurrentRange(requestId, tokenId, estimation[0], estimation[1], tolerance)
       ).to.emit(example, 'IncreaseLiquidity');
       //
       const holdingsAfter = await example.connect(tokenOwner).currentHoldings(tokenId);
@@ -214,8 +224,10 @@ describe('LiquidityExample', function () {
       const [deployer, tokenOwner] = await ethers.getSigners();
       const amount0 = ethers.parseEther('10');
       const requestId = randomHexString(16);
+      const tolerance = 5;
+
       await expect(
-        example.connect(tokenOwner).increaseLiquidityCurrentRange(requestId, 19, amount0, amount0)
+        example.connect(tokenOwner).increaseLiquidityCurrentRange(requestId, 19, amount0, amount0, tolerance)
       ).to.revertedWith('TokenId not found');
     });
     //
@@ -223,8 +235,10 @@ describe('LiquidityExample', function () {
       const [deployer, tokenOwner] = await ethers.getSigners();
       const amount0 = ethers.parseEther('10');
       const requestId = randomHexString(16);
+      const tolerance = 5;
+
       await expect(
-        example.connect(deployer).increaseLiquidityCurrentRange(requestId, tokenId, amount0, amount0)
+        example.connect(deployer).increaseLiquidityCurrentRange(requestId, tokenId, amount0, amount0, tolerance)
       ).to.revertedWith('Not the owner');
     });
   });
@@ -254,8 +268,8 @@ describe('LiquidityExample', function () {
       //
       await printOutBalance(tether, callerAddress, 'DA-before', 'USDT');
       await printOutBalance(usdc, callerAddress, 'DA-before', 'USDC');
-      //
-      const estimation = await example.connect(tokenOwner).estimateDescreaseLiquidity(tokenId, 10, 0);
+      // 10 changges change
+      const estimation = await example.connect(tokenOwner).estimateLiquidityChanges(tokenId, 10);
       console.log(estimation);
       //
       await expect(
@@ -284,38 +298,6 @@ describe('LiquidityExample', function () {
       // expect(diff0 + diff1, 'diff0').to.be.equal(amount0 + amount1);
       //
       console.log('diff0: ', diff0, 'diff1: ', diff1, 'diffSum: ', diff0 + diff1);
-    });
-
-    it('Should decrease liquidity in amount success given valid tokenId', async function () {
-      //   const [deployer, tokenOwner] = await ethers.getSigners();
-      //   const requestId = randomHexString(16);
-      //   const change = ethers.parseEther('100');
-      //   //
-      //   const holdingsBefore = await example.connect(tokenOwner).currentHoldings(tokenId);
-      //   console.log(
-      //     'Before decrease amount: ',
-      //     ethers.formatEther(holdingsBefore[0]),
-      //     ethers.formatEther(holdingsBefore[1])
-      //   );
-      //   //
-      //   await expect(example.connect(tokenOwner).decreaseLiquidity(requestId, tokenId, 0, change)).to.emit(
-      //     example,
-      //     'DecreaseLiquidity'
-      //   );
-      //   //
-      //   const holdingsAfter = await example.connect(tokenOwner).currentHoldings(tokenId);
-      //   console.log(
-      //     'After decrease amount: ',
-      //     ethers.formatEther(holdingsAfter[0]),
-      //     ethers.formatEther(holdingsAfter[1])
-      //   );
-      //   //
-      //   const diff0 = holdingsAfter[0] - holdingsBefore[0];
-      //   const diff1 = holdingsAfter[1] - holdingsBefore[1];
-      //   // diff0 + diff1 may not be qual to amount0 + amount1
-      //   // expect(diff0 + diff1, 'diff0').to.be.equal(amount0 + amount1);
-      //   //
-      //   console.log('diff0: ', diff0, 'diff1: ', diff1, 'diffSum: ', diff0 + diff1);
     });
 
     it('Should decrease liquidity failed given not valid tokenId', async function () {

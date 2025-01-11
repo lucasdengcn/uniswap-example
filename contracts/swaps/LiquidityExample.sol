@@ -10,6 +10,7 @@ import '@uniswap/v3-core/contracts/libraries/FullMath.sol';
 import '@uniswap/v3-core/contracts/libraries/SqrtPriceMath.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-core/contracts/libraries/LowGasSafeMath.sol';
+import '@uniswap/v3-core/contracts/interfaces/IERC20Minimal.sol';
 
 import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
@@ -165,25 +166,47 @@ contract LiquidityExample is IERC721Receiver {
     }
   }
 
+  function _blanceOf(address token, address owner) private view returns (uint256 balance) {
+    balance = IERC20Minimal(token).balanceOf(owner);
+  }
+
+  function _poolInfo()
+    private
+    view
+    returns (int24 tickSpacing, uint128 liquidityCurrent, uint160 sqrtRatioX96, int24 tickCurrent)
+  {
+    IUniswapV3Pool poolContract = IUniswapV3Pool(poolAddress);
+    tickSpacing = poolContract.tickSpacing();
+    liquidityCurrent = poolContract.liquidity();
+    (sqrtRatioX96, tickCurrent, , , , , ) = poolContract.slot0();
+  }
+
   // estimate the new position should be minted given pool's current
   function estimateNewPosition(
-    int24 tickOffset
+    int24 tickOffset,
+    uint24 tolerance
   )
     external
     view
-    returns (uint256 amount0Desired, uint256 amount1Desired, int24 tickLower, int24 tickUpper, uint160 sqrtRatioX96)
+    returns (
+      uint256 amount0Desired,
+      uint256 amount1Desired,
+      int24 tickLower,
+      int24 tickUpper,
+      uint256 amount0Min,
+      uint256 amount1Min
+    )
   {
     // get poolContract Info
-    IUniswapV3Pool poolContract = IUniswapV3Pool(poolAddress);
-    int24 tickSpacing = poolContract.tickSpacing();
-    (uint160 _sqrtRatioX96, int24 tickCurrent, , , , , ) = poolContract.slot0();
-    //
-    sqrtRatioX96 = _sqrtRatioX96;
-    uint128 liquidityCurrent = poolContract.liquidity();
+    (int24 tickSpacing, uint128 liquidityCurrent, uint160 sqrtRatioX96, int24 tickCurrent) = _poolInfo();
     // estimate tickLower, tickUpper
     (tickLower, tickUpper) = estimateTickLowerUpper(tickCurrent, tickSpacing, tickOffset);
     // amount0Desired, amount1Desired
     (amount0Desired, amount1Desired) = _mintAmounts(tickCurrent, tickLower, tickUpper, sqrtRatioX96, liquidityCurrent);
+    //
+    // estimate amount0Min, amount1Min on slippage protection
+    amount0Min = FullMath.mulDiv(amount0Desired, tolerance, 100);
+    amount1Min = FullMath.mulDiv(amount1Desired, tolerance, 100);
   }
 
   function estimateAmountGivenPriceRange(
@@ -193,36 +216,43 @@ contract LiquidityExample is IERC721Receiver {
     // given human price term as token0/token1, Uniswap sqrtPriceX96 is on token1/token0
   }
 
+  struct MintPositionParams {
+    string requestId;
+    uint256 amount0Desired;
+    uint256 amount1Desired;
+    int24 tickLower;
+    int24 tickUpper;
+    uint256 amount0Min;
+    uint256 amount1Min;
+  }
+
   // external functions
   // mintNewPosition to mint new position for token pair and add liqudity
+  // tolerance such as 1, 5, 10 as 1%, 5%, 10%
   function mintNewPosition(
-    string calldata requestId,
-    uint256 amount0Desired,
-    uint256 amount1Desired,
-    int24 tickLower,
-    int24 tickUpper
+    MintPositionParams calldata request
   ) external returns (uint256 tokenId, uint128 liquidityNew, uint256 amount0, uint256 amount1) {
     // TODO: check balance
     IUniswapV3Pool poolContract = IUniswapV3Pool(poolAddress);
     uint24 fee = poolContract.fee();
     // owner --> contract --> positionManaer
-    TransferHelper.safeTransferFrom(token0, msg.sender, address(this), amount0Desired);
-    TransferHelper.safeApprove(token0, positionManager, amount0Desired);
+    TransferHelper.safeTransferFrom(token0, msg.sender, address(this), request.amount0Desired);
+    TransferHelper.safeApprove(token0, positionManager, request.amount0Desired);
     //
-    TransferHelper.safeTransferFrom(token1, msg.sender, address(this), amount1Desired);
-    TransferHelper.safeApprove(token1, positionManager, amount1Desired);
-    // TODO: estimate amount0Min, amount1Min
+    TransferHelper.safeTransferFrom(token1, msg.sender, address(this), request.amount1Desired);
+    TransferHelper.safeApprove(token1, positionManager, request.amount1Desired);
+
     // params
     INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
       token0: token0,
       token1: token1,
       fee: fee,
-      tickLower: tickLower,
-      tickUpper: tickUpper,
-      amount0Desired: amount0Desired,
-      amount1Desired: amount1Desired,
-      amount0Min: 0,
-      amount1Min: 0,
+      tickLower: request.tickLower,
+      tickUpper: request.tickUpper,
+      amount0Desired: request.amount0Desired,
+      amount1Desired: request.amount1Desired,
+      amount0Min: request.amount0Min,
+      amount1Min: request.amount1Min,
       recipient: address(this), // NFT owner
       deadline: block.timestamp
     });
@@ -230,21 +260,19 @@ contract LiquidityExample is IERC721Receiver {
     // Pool will emit Mint(msg.sender, recipient, tickLower, tickUpper, amount, amount0, amount1)
     // PositionManager will emit IncreaseLiquidity(tokenId, liquidity, amount0, amount1)
     (tokenId, liquidityNew, amount0, amount1) = INonfungiblePositionManager(positionManager).mint(params);
-    emit MintPosition(requestId, tokenId, poolAddress, msg.sender, liquidityNew, amount0, amount1);
+    emit MintPosition(request.requestId, tokenId, poolAddress, msg.sender, liquidityNew, amount0, amount1);
     //
-    requestTokenIds[requestId] = tokenId;
+    requestTokenIds[request.requestId] = tokenId;
     // owner is to caller
     _createDeposit(msg.sender, tokenId);
     //
-    if (amount0 < amount0Desired) {
+    if (amount0 < request.amount0Desired) {
       TransferHelper.safeApprove(token0, positionManager, 0);
-      uint256 refund0 = amount0Desired - amount0;
-      TransferHelper.safeTransfer(token0, msg.sender, refund0);
+      TransferHelper.safeTransfer(token0, msg.sender, request.amount0Desired - amount0);
     }
-    if (amount1 < amount1Desired) {
+    if (amount1 < request.amount1Desired) {
       TransferHelper.safeApprove(token1, positionManager, 0);
-      uint256 refund1 = amount1Desired - amount1;
-      TransferHelper.safeTransfer(token1, msg.sender, refund1);
+      TransferHelper.safeTransfer(token1, msg.sender, request.amount1Desired - amount1);
     }
   }
 
@@ -264,16 +292,14 @@ contract LiquidityExample is IERC721Receiver {
       uint128 tokensOwed0,
       uint128 tokensOwed1,
       uint24 fee,
-      int24 tickCurrent,
-      address tokenX0,
-      address tokenY1
+      int24 tickCurrent
     )
   {
     INonfungiblePositionManager nft = INonfungiblePositionManager(positionManager);
     // (uint96 nonce, address operator, address token0, address token1, uint24 fee,
     // int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128,
     // uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)
-    (, , tokenX0, tokenY1, fee, tickLower, tickUpper, liquidity, , , tokensOwed0, tokensOwed1) = nft.positions(tokenId);
+    (, , , , fee, tickLower, tickUpper, liquidity, , , tokensOwed0, tokensOwed1) = nft.positions(tokenId);
     //
     IUniswapV3Pool poolContract = IUniswapV3Pool(poolAddress);
     (sqrtRatioX96, tickCurrent, , , , , ) = poolContract.slot0();
@@ -331,27 +357,23 @@ contract LiquidityExample is IERC721Receiver {
     //
   }
 
-  // estimateDescreaseLiquidity to get correct amount0Min, amount1Min
+  // estimateLiquidityChanges to get correct amount0Min, amount1Min
   // for slippage protection
-  function estimateDescreaseLiquidity(
+  function estimateLiquidityChanges(
     uint256 tokenId,
-    uint24 percentage,
-    uint128 change
+    uint24 percentage
   ) external view returns (uint256 amount0Min, uint256 amount1Min, uint128 liquidityToChange) {
     require(deposits[tokenId].owner != address(0), 'TokenId not found');
     // caller must be the owner of the NFT
     require(msg.sender == deposits[tokenId].owner, 'Not the owner');
-    // get liquidity data for tokenId
-    uint128 _liquidityToChange = change;
-    if (percentage > 0) {
-      uint128 liquidity = deposits[tokenId].liquidity;
-      _liquidityToChange = uint128(FullMath.mulDiv(uint256(liquidity), uint256(percentage), 100));
-    }
     //
     INonfungiblePositionManager nfpm = INonfungiblePositionManager(positionManager);
     //
     (uint160 sqrtRatioX96, , , , , , ) = IUniswapV3Pool(poolAddress).slot0();
-    (, , , , , int24 lowerTick, int24 upperTick, , , , , ) = nfpm.positions(tokenId);
+    (, , , , , int24 lowerTick, int24 upperTick, uint128 liquidity, , , , ) = nfpm.positions(tokenId);
+    //
+    // get liquidity change for tokenId
+    uint128 _liquidityToChange = uint128(FullMath.mulDiv(liquidity, percentage, 100));
     //estimate amounts on current spot price
     (amount0Min, amount1Min) = LiquidityAmounts.getAmountsForLiquidity(
       sqrtRatioX96,
@@ -415,10 +437,18 @@ contract LiquidityExample is IERC721Receiver {
     string calldata requestId,
     uint256 tokenId,
     uint256 amountAdd0,
-    uint256 amountAdd1
+    uint256 amountAdd1,
+    uint24 tolerance
   ) external returns (uint128 liquidity, uint256 amount0, uint256 amount1) {
     require(deposits[tokenId].owner != address(0), 'TokenId not found');
     require(msg.sender == deposits[tokenId].owner, 'Not the owner');
+    // check balance
+    // check token balance
+    uint256 balance0 = IERC20Minimal(token0).balanceOf(msg.sender);
+    uint256 balance1 = IERC20Minimal(token1).balanceOf(msg.sender);
+    //
+    require(balance0 > amountAdd0, 'Token0 is not sufficient');
+    require(balance1 > amountAdd1, 'Token1 is not sufficient');
     //
     // In production, amountAdd0, amount0Min and amountAdd1, amount1Min should be adjusted to create slippage protections.
     //
@@ -429,13 +459,17 @@ contract LiquidityExample is IERC721Receiver {
     TransferHelper.safeTransferFrom(token1, msg.sender, address(this), amountAdd1);
     TransferHelper.safeApprove(token1, positionManager, amountAdd1);
     //
+    // estimate amount0Min, amount1Min on slippage protection
+    uint256 amount0Min = FullMath.mulDiv(amountAdd0, tolerance, 100);
+    uint256 amount1Min = FullMath.mulDiv(amountAdd1, tolerance, 100);
+    //
     INonfungiblePositionManager.IncreaseLiquidityParams memory params = INonfungiblePositionManager
       .IncreaseLiquidityParams({
         tokenId: tokenId,
         amount0Desired: amountAdd0,
         amount1Desired: amountAdd1,
-        amount0Min: 0,
-        amount1Min: 0,
+        amount0Min: amount0Min,
+        amount1Min: amount1Min,
         deadline: block.timestamp
       });
 
