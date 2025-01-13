@@ -24,6 +24,7 @@ npx hardhat ignition deploy ./ignition/modules/Lock.ts
 - Collect Fee
 - Estimate new liquidity at current spot price
 - Estimate decrease liquidity at current spot price
+- FlashSwap
 
 ## Deployment
 
