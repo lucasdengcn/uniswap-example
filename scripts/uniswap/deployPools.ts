@@ -91,12 +91,12 @@ async function main() {
   console.log('Create pool successfully. USDC/WBTC 3000');
   // USDC/USDT
   fee = 3000;
-  const usdcUSDT030 = await deployPool(USDC_ADDRESS, TETHER_ADDRESS, fee, encodePriceSqrt(1, 0.1));
+  const usdcUSDT030 = await deployPool(USDC_ADDRESS, TETHER_ADDRESS, fee, encodePriceSqrt(1, 2));
   await setFeeProtocol(usdcUSDT030);
   console.log('Create pool successfully. USDC/USDT 3000');
   // USDT/USDC
   fee = 10000;
-  const usdtUSDC100 = await deployPool(TETHER_ADDRESS, USDC_ADDRESS, fee, encodePriceSqrt(1, 0.1));
+  const usdtUSDC100 = await deployPool(TETHER_ADDRESS, USDC_ADDRESS, fee, encodePriceSqrt(2, 1));
   await setFeeProtocol(usdtUSDC100);
   console.log('Create pool successfully. USDT/USDC 3000');
   //
