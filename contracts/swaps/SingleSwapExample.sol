@@ -9,7 +9,6 @@ import 'hardhat/console.sol';
 contract SingleSwapExample {
   //
   address public immutable swapRouter;
-  uint24 public constant poolFee = 10000;
 
   //
   constructor(address _swapRouter) {
@@ -28,7 +27,8 @@ contract SingleSwapExample {
   function swapExactInputSingle(
     address tokenIn,
     address tokenOut,
-    uint256 amountIn
+    uint256 amountIn,
+    uint24 poolFee
   ) external returns (uint256 amountOut) {
     // transfer amount of token from sender to this contract
     // step1: transfer (owner --> contract)
@@ -59,7 +59,8 @@ contract SingleSwapExample {
     address tokenIn,
     address tokenOut,
     uint256 amountOut,
-    uint256 amountInMax
+    uint256 amountInMax,
+    uint24 poolFee
   ) external returns (uint256 amountIn) {
     // allowance
     TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(this), amountInMax);
@@ -102,7 +103,9 @@ contract SingleSwapExample {
     address tokenIn,
     address token2,
     address tokenOut,
-    uint256 amountIn
+    uint256 amountIn,
+    uint24 poolFee1,
+    uint24 poolFee2
   ) external returns (uint256 amountOut) {
     // Transfer `amountIn` of DAI to this contract.
     TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(this), amountIn);
@@ -115,7 +118,7 @@ contract SingleSwapExample {
     // The format for pool encoding is (tokenIn, fee, tokenOut/tokenIn, fee, tokenOut) where tokenIn/tokenOut parameter is the shared token across the pools.
     // Since we are swapping DAI to USDC and then USDC to WETH9 the path encoding is (DAI, 0.3%, USDC, 0.3%, WETH9).
     ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
-      path: abi.encodePacked(tokenIn, poolFee, token2, poolFee, tokenOut),
+      path: abi.encodePacked(tokenIn, poolFee1, token2, poolFee2, tokenOut),
       recipient: msg.sender,
       deadline: block.timestamp,
       amountIn: amountIn,
@@ -139,7 +142,9 @@ contract SingleSwapExample {
     address token2,
     address tokenOut,
     uint256 amountOut,
-    uint256 amountInMaximum
+    uint256 amountInMaximum,
+    uint24 poolFee1,
+    uint24 poolFee2
   ) external returns (uint256 amountIn) {
     // Transfer the specified `amountInMaximum` to this contract.
     TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(this), amountInMaximum);
@@ -153,7 +158,7 @@ contract SingleSwapExample {
     // For an exactOutput swap, the first swap that occurs is the swap which returns the eventual desired token.
     // In this case, our desired output token is WETH9 so that swap happens first, and is encoded in the path accordingly.
     ISwapRouter.ExactOutputParams memory params = ISwapRouter.ExactOutputParams({
-      path: abi.encodePacked(tokenOut, poolFee, token2, poolFee, tokenIn),
+      path: abi.encodePacked(tokenOut, poolFee2, token2, poolFee1, tokenIn),
       recipient: msg.sender,
       deadline: block.timestamp,
       amountOut: amountOut,

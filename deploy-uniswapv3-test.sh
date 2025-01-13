@@ -9,8 +9,8 @@ echo "deployTokens DONE"
 npx hardhat run scripts/uniswap/deployPools.ts --network localhost
 echo "deployPools DONE"
 
-npx hardhat run scripts/uniswap/checkLiquidity.ts --network localhost
-echo "checkLiquidity DONE"
+# npx hardhat run scripts/uniswap/checkLiquidity.ts --network localhost
+# echo "checkLiquidity DONE"
 
 npx hardhat run scripts/uniswap/addLiquidity.ts --network localhost
 echo "addLiquidity DONE"

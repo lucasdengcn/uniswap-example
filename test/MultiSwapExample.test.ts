@@ -12,7 +12,7 @@ const USDC_WBTC_500 = process.env.USDC_WBTC_500 || '';
 
 //
 import { expect } from 'chai';
-import { Contract, ContractTransactionResponse, Signer } from 'ethers';
+import { Contract, Signer } from 'ethers';
 import { ethers, ignition } from 'hardhat';
 
 import UniswapV3Pool from '@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json';
@@ -28,7 +28,7 @@ function sqrtToPrice(sqrtPriceX96: any) {
   return ratio;
 }
 
-describe('SingleSwapExampleModule', function () {
+describe('MultiSwapExampleModule', function () {
   let deployer: Signer;
   let tokenOwner: Signer;
   let example: any;
@@ -149,16 +149,19 @@ describe('SingleSwapExampleModule', function () {
     console.log('totalWBTC', totalWBTC);
   });
 
-  describe('Swap ExactInput Single', function () {
-    it('Should swap USDT to USDC success given pool is init', async function () {
+  describe('Swap multihop', function () {
+    //
+    it('Should swap USDT to USDC to WBTC success using exactInput given pool is init', async function () {
       const amountIn = ethers.parseEther('10');
       const callerAddress = await example.getAddress();
       const ownerAddress = await tokenOwner.getAddress();
       //
       totalUSDT = await usdt.balanceOf(tokenOwner);
       totalUSDC = await usdc.balanceOf(tokenOwner);
+      totalWBTC = await wbtc.balanceOf(tokenOwner);
       console.log('totalUSDC: ', totalUSDC);
       console.log('totalUSDT: ', totalUSDT);
+      console.log('totalWBTC: ', totalWBTC);
       console.log('amountIn: ', amountIn);
       //
       const tether: any = await getUSDT(tokenOwner);
@@ -166,85 +169,60 @@ describe('SingleSwapExampleModule', function () {
       await expect(tether.approve(callerAddress, amountIn))
         .to.be.emit(tether, 'Approval')
         .withArgs(ownerAddress, callerAddress, amountIn);
-      // tx (usdt->contract->weth)
-      const tx = await example.connect(tokenOwner).swapExactInputSingle(TETHER_ADDRESS, USDC_ADDRESS, amountIn, 3000);
-      expect(tx).not.be.reverted;
+      // tx (usdt->contract->usdc->wbtc)
+      // USDT->USDC
+      // USDC->WBTC
+      const tx = await example
+        .connect(tokenOwner)
+        .swapExactInputMultihop(TETHER_ADDRESS, USDC_ADDRESS, WBTC_ADDRESS, amountIn, 500, 3000);
+      expect(tx, 'swapExactInputMultihop').not.be.reverted;
       expect(tx).to.be.emit(example, 'SwapResult');
-    });
-
-    it('Should swap USDC to USDT success given pool', async function () {
-      const amountIn = ethers.parseEther('10');
-      const callerAddress = await example.getAddress();
-      const ownerAddress = await tokenOwner.getAddress();
       //
-      totalUSDT = await usdt.balanceOf(ownerAddress);
-      totalUSDC = await usdc.balanceOf(ownerAddress);
+      totalUSDT = await usdt.balanceOf(tokenOwner);
+      totalUSDC = await usdc.balanceOf(tokenOwner);
+      totalWBTC = await wbtc.balanceOf(tokenOwner);
       console.log('totalUSDC: ', totalUSDC);
       console.log('totalUSDT: ', totalUSDT);
-      console.log('amountIn: ', amountIn);
+      console.log('totalWBTC: ', totalWBTC);
       //
-      const tether: any = await getUSDT(tokenOwner);
-      const usdcOwner: any = await getUSDC(tokenOwner);
-      // approve allowance (owner->contract)
-      await expect(usdcOwner.approve(callerAddress, amountIn))
-        .to.be.emit(usdcOwner, 'Approval')
-        .withArgs(ownerAddress, callerAddress, amountIn);
-      // tx (usdt->contract->weth)
-      const tx = await example.connect(tokenOwner).swapExactInputSingle(USDC_ADDRESS, TETHER_ADDRESS, amountIn, 10000);
-      expect(tx).not.be.reverted;
-      expect(tx).to.be.emit(example, 'SwapResult');
     });
 
-    it('Should swap USDT to WETH failed given pool is not deployed', async function () {
-      const amountIn = ethers.parseEther('10');
-      const callerAddress = await example.getAddress();
-      const ownerAddress = await tokenOwner.getAddress();
-      //
-      totalUSDT = await usdt.balanceOf(ownerAddress);
-      totalWETH = await weth.balanceOf(ownerAddress);
-      console.log('totalWETH: ', totalWETH);
-      console.log('totalUSDT: ', totalUSDT);
-      console.log('amountIn: ', amountIn);
-      //
-      const tether: any = await getUSDT(tokenOwner);
-      const wethOwner: any = await getWETH(tokenOwner);
-      // approve allowance (owner->contract)
-      await expect(tether.approve(callerAddress, amountIn))
-        .to.be.emit(tether, 'Approval')
-        .withArgs(ownerAddress, callerAddress, amountIn);
-      // tx (usdt->contract->weth)
-      await expect(example.connect(tokenOwner).swapExactInputSingle(TETHER_ADDRESS, WETH_ADDRESS, amountIn, 3000)).to.be
-        .reverted;
-      //
-      expect(await weth.balanceOf(ownerAddress), 'WETH balance').to.be.equal(totalWETH);
-      expect(await usdt.balanceOf(ownerAddress), 'USDT balance').to.be.equal(totalUSDT);
-    });
-  });
-
-  describe('Swap ExactOut Single', function () {
-    it('Should swap USDT to WBTC success given pool is init', async function () {
+    it('Should swap USDT to USDC to WBTC success using exactOut given pool is init', async function () {
       const amountOut = ethers.parseEther('10');
-      const amountInMax = ethers.parseEther('13');
+      const amountInMaximum = ethers.parseEther('12');
+
       const callerAddress = await example.getAddress();
       const ownerAddress = await tokenOwner.getAddress();
       //
       totalUSDT = await usdt.balanceOf(tokenOwner);
+      totalUSDC = await usdc.balanceOf(tokenOwner);
       totalWBTC = await wbtc.balanceOf(tokenOwner);
-      console.log('totalWBTC: ', totalWBTC);
+      console.log('totalUSDC: ', totalUSDC);
       console.log('totalUSDT: ', totalUSDT);
+      console.log('totalWBTC: ', totalWBTC);
       console.log('amountOut: ', amountOut);
       //
       const tether: any = await getUSDT(tokenOwner);
       // approve allowance (owner->contract)
-      await expect(tether.approve(callerAddress, amountInMax), 'USDT approve')
+      await expect(tether.approve(callerAddress, amountInMaximum))
         .to.be.emit(tether, 'Approval')
-        .withArgs(ownerAddress, callerAddress, amountInMax);
-      // tx (usdt->contract->wbtc)
-      const tx: ContractTransactionResponse = await example
+        .withArgs(ownerAddress, callerAddress, amountInMaximum);
+      // tx (usdt->contract->usdc->wbtc)
+      // USDT->USDC
+      // USDC->WBTC
+      const tx = await example
         .connect(tokenOwner)
-        .swapExactOutputSingle(TETHER_ADDRESS, WBTC_ADDRESS, amountOut, amountInMax, 3000);
-      expect(tx, 'swapExactOutputSingle').not.be.reverted;
+        .swapExactOutputMultihop(TETHER_ADDRESS, USDC_ADDRESS, WBTC_ADDRESS, amountOut, amountInMaximum, 3000, 3000);
+      expect(tx, 'swapExactOutputMultihop').not.be.reverted;
       expect(tx).to.be.emit(example, 'SwapResult');
+      //
+      totalUSDT = await usdt.balanceOf(tokenOwner);
+      totalUSDC = await usdc.balanceOf(tokenOwner);
+      totalWBTC = await wbtc.balanceOf(tokenOwner);
+      console.log('totalUSDC: ', totalUSDC);
+      console.log('totalUSDT: ', totalUSDT);
+      console.log('totalWBTC: ', totalWBTC);
+      //
     });
   });
 });
