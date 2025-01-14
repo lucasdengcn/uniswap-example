@@ -35,66 +35,78 @@ contract FlashSwapExample is IUniswapV3FlashCallback, PeripheryImmutableState, P
     address token
   );
 
+  // borrow tokens(amount0, amount1) to this contract.
+  // swapping in pool1: token1 --> token0 (amount1, fee2) -> amountOut0
+  // swapping in pool2: token0 --> token1 (amount0, fee3) -> amountOut1
+
   // execute after Pool has transfer amount of tokens to this contract.
   function uniswapV3FlashCallback(uint256 fee0, uint256 fee1, bytes calldata data) external override {
+    // console.log('uniswapV3FlashCallback fees: fee0:', fee0, ', fee1: ', fee1);
     //
     FlashCallbackData memory decoded = abi.decode(data, (FlashCallbackData));
     CallbackValidation.verifyCallback(factory, decoded.poolKey);
     //
     address token0 = decoded.poolKey.token0;
     address token1 = decoded.poolKey.token1;
-    // allowance from this contract to swapRouter
-    TransferHelper.safeApprove(token0, swapRouter, decoded.amount0);
-    TransferHelper.safeApprove(token1, swapRouter, decoded.amount1);
+    // allowance from this contract to swapRouter (borrowed tokens)
+    if (decoded.amount0 > 0) {
+      TransferHelper.safeApprove(token0, swapRouter, decoded.amount0);
+    }
+    if (decoded.amount1 > 0) {
+      TransferHelper.safeApprove(token1, swapRouter, decoded.amount1);
+    }
     // profitable check
     // exactInputSingle will fail if this amount not met
     // only profitable if swap can get at least amount of.
     uint256 amount1Min = LowGasSafeMath.add(decoded.amount1, fee1);
     uint256 amount0Min = LowGasSafeMath.add(decoded.amount0, fee0);
-    // Step2: sell lower price token (in), buy higher price token (out)
-    // swap for the expensive token0 using token1 in pool w/fee2
     // Step2: call exactInputSingle for swapping token1(borrowed) for token0 in pool w/fee2
     // this contract will get amount of token0 (borrowed + swapped)
-    uint256 amountOut0 = ISwapRouter(swapRouter).exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: token1,
-        tokenOut: token0,
-        fee: decoded.poolFee2,
-        recipient: address(this),
-        deadline: block.timestamp,
-        amountIn: decoded.amount1, // INPUT
-        amountOutMinimum: amount0Min,
-        sqrtPriceLimitX96: 0
-      })
-    );
-    // Step3: sell lower price token (in), buy higher price token (out)
-    // swap for the expensive token1 using token0 in pool w/fee3
+    uint256 amountOut0;
+    if (decoded.amount1 > 0) {
+      amountOut0 = ISwapRouter(swapRouter).exactInputSingle(
+        ISwapRouter.ExactInputSingleParams({
+          tokenIn: token1,
+          tokenOut: token0,
+          fee: decoded.poolFee2,
+          recipient: address(this),
+          deadline: block.timestamp,
+          amountIn: decoded.amount1, // INPUT
+          amountOutMinimum: amount0Min,
+          sqrtPriceLimitX96: 0
+        })
+      );
+      // this contract's balance will increase by amountOut0
+      // console.log('Swap token1 for token0: ', amountOut0);
+    }
     // Step3: call exactInputSingle for swapping token0 for token1 in pool w/fee3
     // this contract will get amount of token1
-    uint256 amountOut1 = ISwapRouter(swapRouter).exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: token0,
-        tokenOut: token1,
-        fee: decoded.poolFee3,
-        recipient: address(this),
-        deadline: block.timestamp + 200,
-        amountIn: decoded.amount0, // INPUT
-        amountOutMinimum: amount1Min,
-        sqrtPriceLimitX96: 0
-      })
-    );
+    uint256 amountOut1;
+    if (decoded.amount0 > 0) {
+      amountOut1 = ISwapRouter(swapRouter).exactInputSingle(
+        ISwapRouter.ExactInputSingleParams({
+          tokenIn: token0,
+          tokenOut: token1,
+          fee: decoded.poolFee3,
+          recipient: address(this),
+          deadline: block.timestamp + 200,
+          amountIn: decoded.amount0, // INPUT
+          amountOutMinimum: amount1Min,
+          sqrtPriceLimitX96: 0
+        })
+      );
+      // this contract's balance will increase by amountOut1
+      // console.log('Swap token0 for token1: ', amountOut1);
+    }
+
+    // token0 process
     // borrowed amount + fee
     uint256 amount0Owed = amount0Min;
-    uint256 amount1Owed = amount1Min;
+    // console.log('FlashSwapCallback token0:', amount0Owed, amountOut0, decoded.amount0);
     // pay back borrowed token
-    // the contract is spender
     TransferHelper.safeApprove(token0, address(this), amount0Owed);
-    TransferHelper.safeApprove(token1, address(this), amount1Owed);
     if (amount0Owed > 0) {
       pay(token0, address(this), msg.sender, amount0Owed);
-    }
-    if (amount1Owed > 0) {
-      pay(token1, address(this), msg.sender, amount1Owed);
     }
     // collect profits
     if (amountOut0 > amount0Owed) {
@@ -102,6 +114,14 @@ contract FlashSwapExample is IUniswapV3FlashCallback, PeripheryImmutableState, P
       TransferHelper.safeApprove(token0, address(this), profit0);
       pay(token0, address(this), decoded.payer, profit0);
       emit FlashSwapProfit(decoded.payer, token0, token1, decoded.poolFee2, profit0, token0);
+    }
+    // token1 process
+    //
+    uint256 amount1Owed = amount1Min;
+    // console.log('FlashSwapCallback token1:', amount1Owed, amountOut1, decoded.amount1);
+    TransferHelper.safeApprove(token1, address(this), amount1Owed);
+    if (amount1Owed > 0) {
+      pay(token1, address(this), msg.sender, amount1Owed);
     }
     if (amountOut1 > amount1Owed) {
       uint256 profit1 = LowGasSafeMath.sub(amountOut1, amount1Owed);
@@ -133,20 +153,20 @@ contract FlashSwapExample is IUniswapV3FlashCallback, PeripheryImmutableState, P
     uint24 poolFee3;
   }
 
-  // token0 --> token1 (pool1, fee1) --> token0 (pool2, fee2)
+  // borrow tokens(amount0, amount1) to this contract.
+  // swapping in pool1: token1 --> token0 (amount1, fee2) -> amountOut0
+  // swapping in pool2: token0 --> token1 (amount0, fee3) -> amountOut1
   function startFlash(FlashParams calldata params) external {
+    require(params.amount0 > 0, 'amount0 shoud be gt zero');
+    require(params.amount1 > 0, 'amount1 shoud be gt zero');
     // for locating pool
-    PoolAddress.PoolKey memory poolKey = PoolAddress.PoolKey({
-      token0: params.token0,
-      token1: params.token1,
-      fee: params.fee1
-    });
+    PoolAddress.PoolKey memory poolKey = PoolAddress.getPoolKey(params.token0, params.token1, params.fee1);
     IUniswapV3Pool pool = IUniswapV3Pool(PoolAddress.computeAddress(factory, poolKey));
     // start flash, recipient address should be this contract
     // uniswapV3FlashCallback will receive the result.
     // step1: transfer amount of token from Pool to this contract
     pool.flash(
-      address(this), // recipient address
+      address(this), // recipient address for receive borrowed tokens
       params.amount0,
       params.amount1,
       abi.encode(

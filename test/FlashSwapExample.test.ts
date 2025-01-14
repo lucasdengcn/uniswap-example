@@ -16,7 +16,7 @@ describe('FlashSwapExampleModule', function () {
   let usdt: any, usdc: any, weth: any, wbtc: any;
   let totalUSDT: bigint, totalUSDC: bigint, totalWETH: bigint, totalWBTC: bigint;
 
-  async function printBalance(name: string, signer: Signer) {
+  async function printBalance(name: string, signer: string) {
     const usdt = await CS.getUSDT();
     const usdc = await CS.getUSDC();
     let token0Balance = await usdt.balanceOf(signer);
@@ -31,7 +31,11 @@ describe('FlashSwapExampleModule', function () {
   }
   before(async function () {
     // listene contract events
-    CS.getPoolContract(CS.USDT_USDC_500, 'USDT_USDC_500');
+    const poolContract = CS.getPoolContract(CS.USDT_USDC_500, 'USDT_USDC_500');
+    const poolData = await CS.getPoolData(poolContract);
+    console.log(poolData.token0 == CS.TETHER_ADDRESS);
+    console.log(poolData.token1 == CS.USDC_ADDRESS);
+    //
     CS.getPoolContract(CS.USDT_USDC_030, 'USDT_USDC_030');
     CS.getPoolContract(CS.USDT_USDC_100, 'USDT_USDC_100');
     //
@@ -53,6 +57,7 @@ describe('FlashSwapExampleModule', function () {
         console.log('FlashSwapProfit:', fee, token == CS.TETHER_ADDRESS ? 'USDT' : 'USDC', ethers.formatEther(profit));
       }
     );
+    //
   });
 
   it('Should deploy success', async function () {
@@ -83,14 +88,22 @@ describe('FlashSwapExampleModule', function () {
   //   P3, USDT/USDC 10000 2:1
   // Then
   //
-  it('Should FlashSwap USDT/USDC (500, 3000, 10000)', async function () {
+  it('Should FlashSwap USDT/USDC success given amounts(1,1)', async function () {
     const amount0 = ethers.parseEther('1');
     const amount1 = ethers.parseEther('1');
     console.log('amount0: ', amount0);
     console.log('amount1: ', amount1);
     //
-    await printBalance('BEFORE', user3);
-    const tx = await flashSwap.connect(user3).startFlash(
+    // Borrow: 1 USDT, 1 USDC
+    // fees: 1 * 0.05% USDT, 1 * 0.05% USDC
+    // Amount Min: > 1 USDT, > 1 USDC
+    // Swap USDT for USDC in P2: 2 * (1-0.3%) USDC = 1.994 USDC > 1 USDC
+    // Swap USDC for USDT in P3: 2 * (1-1%) = 1.98 USDT > 1USDT
+    // USDT Profit: 1.98 - 1 - 0.05% = 0.98 USDT
+    // USDC Profit: 1.994 - 1 - 0.05% = 0.994 USDC
+    //
+    await printBalance('BEFORE', await tokenOwner.getAddress());
+    const tx = await flashSwap.connect(tokenOwner).startFlash(
       {
         token0: CS.TETHER_ADDRESS,
         token1: CS.USDC_ADDRESS,
@@ -102,15 +115,21 @@ describe('FlashSwapExampleModule', function () {
       },
       { gasLimit: 1000000 }
     );
-    await printBalance('AFTER', user3);
+    await printBalance('AFTER', await tokenOwner.getAddress());
     expect(tx).not.to.be.reverted;
     expect(tx).to.emit(flashSwap, 'FlashSwapProfit');
   });
-  it('Should FlashSwap USDT/USDC-2 (500, 3000, 10000)', async function () {
+  it('Should FlashSwap USDT/USDC fail given amounts(1,2)', async function () {
     const amount0 = ethers.parseEther('1');
     const amount1 = ethers.parseEther('2');
     console.log('amount0: ', amount0);
     console.log('amount1: ', amount1);
+    //
+    // Borrow: 1 USDT, 2 USDC
+    // fees: 1 * 0.05% USDT, 2 * 0.05% USDC
+    // Amount Min: > 1 USDT, > 2 USDC
+    // Swap USDT for USDC in P2: 1 * 2 * (1-0.3%) USDC < 2 USDC  (Failed!)
+    // Swap USDC for USDT in P3: 2 * 2 * (1-1%) > 1 USDT
     //
     await expect(
       flashSwap.connect(user3).startFlash(
@@ -127,13 +146,19 @@ describe('FlashSwapExampleModule', function () {
       )
     ).to.be.reverted;
   });
-  it('Should FlashSwap USDT/USDC-3 (500, 3000, 10000)', async function () {
+  it('Should FlashSwap USDT/USDC fail given amounts(2,1)', async function () {
     [deployer, tokenOwner, user3] = await ethers.getSigners();
     const amount0 = ethers.parseEther('2');
     const amount1 = ethers.parseEther('1');
     console.log('amount0: ', amount0);
     console.log('amount1: ', amount1);
     //
+    // Borrow: 2 USDT, 1 USDC
+    // fees: 2 * 0.05% USDT, 1 * 0.05% USDC
+    // Amount Min: > 2 USDT, > 1 USDC
+    // Swap USDT for USDC in P2: 2 * 2 * (1-0.3%) USDC > 1 USDC
+    // Swap USDC for USDT in P3: 1 * 2 * (1-1%) > 1 USDT < 2 USDT (Failed!)
+    //
     await expect(
       flashSwap.connect(user3).startFlash(
         {
@@ -149,13 +174,20 @@ describe('FlashSwapExampleModule', function () {
       )
     ).to.be.reverted;
   });
-  it('Should FlashSwap USDT/USDC-4 (500, 3000, 10000)', async function () {
+  it('Should FlashSwap USDT/USDC success given amounts(2,3)', async function () {
     const amount0 = ethers.parseEther('2');
     const amount1 = ethers.parseEther('3');
     console.log('amount0: ', amount0);
     console.log('amount1: ', amount1);
     //
-    await printBalance('BEFORE', user4);
+    // Borrow: 2 USDT, 3 USDC
+    // fees: 2 * 0.05% USDT, 3 * 0.05% USDC
+    // Amount Min: > 2 USDT, > 3 USDC
+    // Swap USDT for USDC in P2: 2 * 2 * (1-0.3%) USDC > 3 USDC
+    // Swap USDC for USDT in P3: 3 * 2 * (1-1%) > 4 USDT
+    //
+    //
+    await printBalance('BEFORE', await user4.getAddress());
     await expect(
       flashSwap.connect(user4).startFlash(
         {
@@ -170,15 +202,22 @@ describe('FlashSwapExampleModule', function () {
         { gasLimit: 1000000 }
       )
     ).not.to.be.reverted;
-    await printBalance('AFTER', user4);
+    await printBalance('AFTER', await user4.getAddress());
   });
-  it('Should FlashSwap USDT/USDC-5 (500, 3000, 10000)', async function () {
+  it('Should FlashSwap USDT/USDC success given amounts(4,5)', async function () {
     const amount0 = ethers.parseEther('4');
     const amount1 = ethers.parseEther('5');
     console.log('amount0: ', amount0);
     console.log('amount1: ', amount1);
     //
-    await printBalance('BEFORE', user5);
+    // Borrow: 4 USDT, 5 USDC
+    // fees: 4 * 0.05% USDT, 5 * 0.05% USDC
+    // Amount Min: > 4 USDT, > 5 USDC
+    // Swap USDT for USDC in P2: 4 * 2 * (1-0.3%) USDC > 7 USDC
+    // Swap USDC for USDT in P3: 5 * 2 * (1-1%) > 9 USDT
+    //
+    //
+    await printBalance('BEFORE', await user5.getAddress());
     await expect(
       flashSwap.connect(user5).startFlash(
         {
@@ -193,6 +232,6 @@ describe('FlashSwapExampleModule', function () {
         { gasLimit: 1000000 }
       )
     ).not.to.be.reverted;
-    await printBalance('AFTER', user5);
+    await printBalance('AFTER', await user5.getAddress());
   });
 });
