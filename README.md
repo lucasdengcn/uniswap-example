@@ -26,6 +26,7 @@ npx hardhat ignition deploy ./ignition/modules/Lock.ts
 - Estimate decrease liquidity at current spot price
 - FlashSwap
 - Quoter and QuoterV2
+- TWAP price
 
 ## Deployment
 

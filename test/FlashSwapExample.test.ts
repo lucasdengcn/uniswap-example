@@ -84,10 +84,11 @@ describe('FlashSwapExampleModule', function () {
 
   // Given
   //   P1, USDT/USDC 500 1:1
-  //   P2, USDT/USDC 3000 1:2
-  //   P3, USDT/USDC 10000 2:1
+  //   P2, USDT/USDC 3000 2:1
+  //   P3, USDT/USDC 10000 1:2
   // Then
-  //
+  //   Swap out the high price token
+  //   Swap in the low price token
   it('Should FlashSwap USDT/USDC success given amounts(1,1)', async function () {
     const amount0 = ethers.parseEther('1');
     const amount1 = ethers.parseEther('1');
@@ -97,10 +98,15 @@ describe('FlashSwapExampleModule', function () {
     // Borrow: 1 USDT, 1 USDC
     // fees: 1 * 0.05% USDT, 1 * 0.05% USDC
     // Amount Min: > 1 USDT, > 1 USDC
-    // Swap USDT for USDC in P2: 2 * (1-0.3%) USDC = 1.994 USDC > 1 USDC
-    // Swap USDC for USDT in P3: 2 * (1-1%) = 1.98 USDT > 1USDT
+    //
+    // Swap USDT for USDC in P3: 2 * (1-0.3%) USDC = 1.994 USDC > 1 USDC
+    // Swap USDC for USDT in P2: 2 * (1-1%) = 1.98 USDT > 1USDT
     // USDT Profit: 1.98 - 1 - 0.05% = 0.98 USDT
     // USDC Profit: 1.994 - 1 - 0.05% = 0.994 USDC
+    //
+    // What if
+    // Swap USDT for USDC in P2: 1 * 1/2 * (1-0.3%) USDC < 1 USDC (Failed)
+    // Swap USDC for USDT in P3: 1 * 1/2 * (1-1%) USDT < 1 USDT (Failed)
     //
     await printBalance('BEFORE', await tokenOwner.getAddress());
     const tx = await flashSwap.connect(tokenOwner).startFlash(
@@ -128,8 +134,8 @@ describe('FlashSwapExampleModule', function () {
     // Borrow: 1 USDT, 2 USDC
     // fees: 1 * 0.05% USDT, 2 * 0.05% USDC
     // Amount Min: > 1 USDT, > 2 USDC
-    // Swap USDT for USDC in P2: 1 * 2 * (1-0.3%) USDC < 2 USDC  (Failed!)
-    // Swap USDC for USDT in P3: 2 * 2 * (1-1%) > 1 USDT
+    // Swap USDT for USDC in P3: 1 * 2 * (1-0.3%) USDC < 2 USDC (Failed)
+    // Swap USDC for USDT in P2: 2 * 2 * (1-1%) > 1 USDT
     //
     await expect(
       flashSwap.connect(user3).startFlash(
@@ -156,8 +162,8 @@ describe('FlashSwapExampleModule', function () {
     // Borrow: 2 USDT, 1 USDC
     // fees: 2 * 0.05% USDT, 1 * 0.05% USDC
     // Amount Min: > 2 USDT, > 1 USDC
-    // Swap USDT for USDC in P2: 2 * 2 * (1-0.3%) USDC > 1 USDC
-    // Swap USDC for USDT in P3: 1 * 2 * (1-1%) > 1 USDT < 2 USDT (Failed!)
+    // Swap USDT for USDC in P3: 2 * 2 * (1-0.3%) USDC > 1 USDC
+    // Swap USDC for USDT in P2: 1 * 2 * (1-1%) < 2 USDT (Failed!)
     //
     await expect(
       flashSwap.connect(user3).startFlash(
@@ -183,8 +189,8 @@ describe('FlashSwapExampleModule', function () {
     // Borrow: 2 USDT, 3 USDC
     // fees: 2 * 0.05% USDT, 3 * 0.05% USDC
     // Amount Min: > 2 USDT, > 3 USDC
-    // Swap USDT for USDC in P2: 2 * 2 * (1-0.3%) USDC > 3 USDC
-    // Swap USDC for USDT in P3: 3 * 2 * (1-1%) > 4 USDT
+    // Swap USDT for USDC in P3: 2 * 2 * (1-0.3%) USDC > 3 USDC
+    // Swap USDC for USDT in P2: 3 * 2 * (1-1%) > 4 USDT
     //
     //
     await printBalance('BEFORE', await user4.getAddress());
@@ -213,8 +219,8 @@ describe('FlashSwapExampleModule', function () {
     // Borrow: 4 USDT, 5 USDC
     // fees: 4 * 0.05% USDT, 5 * 0.05% USDC
     // Amount Min: > 4 USDT, > 5 USDC
-    // Swap USDT for USDC in P2: 4 * 2 * (1-0.3%) USDC > 7 USDC
-    // Swap USDC for USDT in P3: 5 * 2 * (1-1%) > 9 USDT
+    // Swap USDT for USDC in P3: 4 * 2 * (1-0.3%) USDC > 7 USDC
+    // Swap USDC for USDT in P2: 5 * 2 * (1-1%) > 9 USDT
     //
     //
     await printBalance('BEFORE', await user5.getAddress());

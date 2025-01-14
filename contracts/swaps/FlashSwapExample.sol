@@ -35,10 +35,11 @@ contract FlashSwapExample is IUniswapV3FlashCallback, PeripheryImmutableState, P
     address token
   );
 
+  // Swap out the high price token
+  // Swap in the low price token
   // borrow tokens(amount0, amount1) to this contract.
   // swapping in pool1: token1 --> token0 (amount1, fee2) -> amountOut0
   // swapping in pool2: token0 --> token1 (amount0, fee3) -> amountOut1
-
   // execute after Pool has transfer amount of tokens to this contract.
   function uniswapV3FlashCallback(uint256 fee0, uint256 fee1, bytes calldata data) external override {
     // console.log('uniswapV3FlashCallback fees: fee0:', fee0, ', fee1: ', fee1);
