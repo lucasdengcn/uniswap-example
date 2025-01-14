@@ -5,11 +5,15 @@ const TETHER_ADDRESS = process.env.TETHER_ADDRESS || '';
 const USDC_ADDRESS = process.env.USDC_ADDRESS || '';
 const WBTC_ADDRESS = process.env.WBTC_ADDRESS || '';
 const WETH_ADDRESS = process.env.WETH_ADDRESS || '';
+//
 const FACTORY_ADDRESS = process.env.FACTORY_ADDRESS || '';
 const SWAP_ROUTER_ADDRESS = process.env.SWAP_ROUTER_ADDRESS;
 const NFT_DESCRIPTOR_ADDRESS = process.env.NFT_DESCRIPTOR_ADDRESS;
 const POSITION_DESCRIPTOR_ADDRESS = process.env.POSITION_DESCRIPTOR_ADDRESS;
 const POSITION_MANAGER_ADDRESS = process.env.POSITION_MANAGER_ADDRESS || '';
+const QUOTER_ADDRESS = process.env.QUOTER_ADDRESS || '';
+const QUOTERV2_ADDRESS = process.env.QUOTERV2_ADDRESS || '';
+//
 const USDT_USDC_500 = process.env.USDT_USDC_500 || '';
 const USDT_WBTC_500 = process.env.USDT_WBTC_500 || '';
 const USDC_WBTC_500 = process.env.USDC_WBTC_500 || '';
@@ -32,6 +36,8 @@ const artifacts: { [name: string]: ContractJson } = {
   USDC: require('../../artifacts/contracts/tokens/Usdc.sol/Usdc.json'),
   WBTC: require('../../artifacts/contracts/tokens/WrappedBitcoin.sol/WrappedBitcoin.json'),
   UniswapV3Pool: require('@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json'),
+  Quoter: require('@uniswap/v3-periphery/artifacts/contracts/lens/Quoter.sol/Quoter.json'),
+  QuoterV2: require('@uniswap/v3-periphery/artifacts/contracts/lens/QuoterV2.sol/QuoterV2.json'),
 };
 
 type TokenJson = { abi: any; bytecode: string; address: string; symbol: string; name: string };

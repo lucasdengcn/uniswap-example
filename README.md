@@ -25,6 +25,7 @@ npx hardhat ignition deploy ./ignition/modules/Lock.ts
 - Estimate new liquidity at current spot price
 - Estimate decrease liquidity at current spot price
 - FlashSwap
+- Quoter and QuoterV2
 
 ## Deployment
 
@@ -49,3 +50,7 @@ sh deploy-uniswapv3-test.sh
 A "reverted with reason 'STF'" error on a Uniswap V3 swap typically means a "Safe Transfer Failed," which usually occurs when you haven't properly approved your wallet to spend the required amount of tokens with the Uniswap contract, indicating an issue with the token approval process on your wallet side.
 
 - ST: Safe Transfer Failed.
+
+## EthersJs v6
+
+<https://docs.ethers.org/v6/api/contract/#BaseContractMethod-staticCall>

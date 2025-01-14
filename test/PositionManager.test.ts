@@ -1,38 +1,44 @@
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.address.env' });
 
-const TETHER_ADDRESS = process.env.TETHER_ADDRESS || '';
-const USDC_ADDRESS = process.env.USDC_ADDRESS || '';
-const WBTC_ADDRESS = process.env.WBTC_ADDRESS || '';
-const WETH_ADDRESS = process.env.WETH_ADDRESS || '';
-const POSITION_MANAGER_ADDRESS = process.env.POSITION_MANAGER_ADDRESS || '';
-const USDT_USDC_500 = process.env.USDT_USDC_500 || '';
-const USDT_WBTC_500 = process.env.USDT_WBTC_500 || '';
-const USDC_WBTC_500 = process.env.USDC_WBTC_500 || '';
+import { artifacts } from '../scripts/uniswap/shared';
+import * as CS from './ContractShared.test';
 
 //
-import { Contract, Signer } from 'ethers';
-import { ethers, ignition } from 'hardhat';
 import { expect } from 'chai';
-import { TickMath } from '@uniswap/v3-sdk';
-
-import { artifacts } from '../scripts/uniswap/shared';
+import { Contract } from 'ethers';
+import { ethers, ignition } from 'hardhat';
+import LiquidityExampleModule from '../ignition/modules/LiquidityExampleModule';
 
 describe('PositionManager', function () {
   let nfpm: any;
-  let tokenId: number = 9;
+  let tokenId: number = 7;
+  let pmContract: any;
   before(async function () {
-    nfpm = new Contract(POSITION_MANAGER_ADDRESS, artifacts.NonfungiblePositionManager.abi, ethers.provider);
+    nfpm = new Contract(CS.POSITION_MANAGER_ADDRESS, artifacts.NonfungiblePositionManager.abi, ethers.provider);
+    //
+    const { contract } = await ignition.deploy(LiquidityExampleModule, {
+      parameters: {
+        LiquidityExampleModule: {
+          positionManager: CS.POSITION_MANAGER_ADDRESS,
+          poolAddress: CS.USDT_USDC_500,
+          token0: CS.TETHER_ADDRESS,
+          token1: CS.USDC_ADDRESS,
+        },
+      },
+    });
+    await contract.waitForDeployment();
+    pmContract = contract;
   });
 
-  it('Should return owner given valid tokenId', async function () {
+  it('Should owner be Liquidity Contract given valid tokenId', async function () {
     const [deployer, tokenOwner] = await ethers.getSigners();
     // 10, 0x51A1ceB83B83F1985a81C295d1fF28Afef186E02
-    const owner1 = await nfpm.ownerOf(10);
-    console.log(owner1);
-    const owner2 = await nfpm.ownerOf(9);
-    console.log(owner2);
+    const owner2 = await nfpm.ownerOf(7);
+    console.log(`tokenId ${tokenId} owner is: ${owner2}`);
     console.log(await tokenOwner.getAddress());
+    console.log('Liquidity Contract: ', await pmContract.getAddress());
+    expect(await pmContract.getAddress()).to.be.equal(owner2);
   });
 
   it('Should return position info given valid tokenId', async function () {

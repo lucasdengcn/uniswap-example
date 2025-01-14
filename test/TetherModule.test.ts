@@ -1,17 +1,10 @@
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.address.env' });
 
-const TETHER_ADDRESS = process.env.TETHER_ADDRESS || '';
-const USDC_ADDRESS = process.env.USDC_ADDRESS || '';
-const WBTC_ADDRESS = process.env.WBTC_ADDRESS || '';
-const WETH_ADDRESS = process.env.WETH_ADDRESS || '';
-const SWAP_ROUTER_ADDRESS = process.env.SWAP_ROUTER_ADDRESS || '';
-
 //
-import { ethers, ignition } from 'hardhat';
 import { expect } from 'chai';
+import { ethers } from 'hardhat';
 
-import TetherModule from '../ignition/modules/TetherModule';
 import { Signer } from 'ethers';
 
 describe('TetherModule', function () {

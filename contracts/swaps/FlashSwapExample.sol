@@ -51,7 +51,8 @@ contract FlashSwapExample is IUniswapV3FlashCallback, PeripheryImmutableState, P
     // only profitable if swap can get at least amount of.
     uint256 amount1Min = LowGasSafeMath.add(decoded.amount1, fee1);
     uint256 amount0Min = LowGasSafeMath.add(decoded.amount0, fee0);
-    // Step2: swap for the expensive token0 using token1 in pool w/fee2
+    // Step2: sell lower price token (in), buy higher price token (out)
+    // swap for the expensive token0 using token1 in pool w/fee2
     // Step2: call exactInputSingle for swapping token1(borrowed) for token0 in pool w/fee2
     // this contract will get amount of token0 (borrowed + swapped)
     uint256 amountOut0 = ISwapRouter(swapRouter).exactInputSingle(
@@ -66,7 +67,8 @@ contract FlashSwapExample is IUniswapV3FlashCallback, PeripheryImmutableState, P
         sqrtPriceLimitX96: 0
       })
     );
-    // Step3: swap for the expensive token1 using token0 in pool w/fee3
+    // Step3: sell lower price token (in), buy higher price token (out)
+    // swap for the expensive token1 using token0 in pool w/fee3
     // Step3: call exactInputSingle for swapping token0 for token1 in pool w/fee3
     // this contract will get amount of token1
     uint256 amountOut1 = ISwapRouter(swapRouter).exactInputSingle(
@@ -84,10 +86,10 @@ contract FlashSwapExample is IUniswapV3FlashCallback, PeripheryImmutableState, P
     // borrowed amount + fee
     uint256 amount0Owed = amount0Min;
     uint256 amount1Owed = amount1Min;
+    // pay back borrowed token
     // the contract is spender
     TransferHelper.safeApprove(token0, address(this), amount0Owed);
     TransferHelper.safeApprove(token1, address(this), amount1Owed);
-    // pay back
     if (amount0Owed > 0) {
       pay(token0, address(this), msg.sender, amount0Owed);
     }
@@ -99,14 +101,12 @@ contract FlashSwapExample is IUniswapV3FlashCallback, PeripheryImmutableState, P
       uint256 profit0 = LowGasSafeMath.sub(amountOut0, amount0Owed);
       TransferHelper.safeApprove(token0, address(this), profit0);
       pay(token0, address(this), decoded.payer, profit0);
-      console.log('collect profit0: ', amountOut0, amount0Owed, profit0);
       emit FlashSwapProfit(decoded.payer, token0, token1, decoded.poolFee2, profit0, token0);
     }
     if (amountOut1 > amount1Owed) {
       uint256 profit1 = LowGasSafeMath.sub(amountOut1, amount1Owed);
       TransferHelper.safeApprove(token1, address(this), profit1);
       pay(token1, address(this), decoded.payer, profit1);
-      console.log('collect profit1: ', amountOut1, amount1Owed, profit1);
       emit FlashSwapProfit(decoded.payer, token0, token1, decoded.poolFee3, profit1, token1);
     }
   }
