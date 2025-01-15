@@ -28,7 +28,9 @@ contract SingleSwapExample {
     address tokenIn,
     address tokenOut,
     uint256 amountIn,
-    uint24 poolFee
+    uint24 poolFee,
+    uint256 amountOutMinimum,
+    uint160 sqrtPriceLimitX96
   ) external returns (uint256 amountOut) {
     // transfer amount of token from sender to this contract
     // step1: transfer (owner --> contract)
@@ -45,8 +47,8 @@ contract SingleSwapExample {
       recipient: msg.sender,
       deadline: block.timestamp,
       amountIn: amountIn,
-      amountOutMinimum: 0, // 0 means no limit
-      sqrtPriceLimitX96: 0 // 0 means no limit
+      amountOutMinimum: amountOutMinimum, // 0 means no limit
+      sqrtPriceLimitX96: sqrtPriceLimitX96 // 0 means inactive
     });
     //
     amountOut = ISwapRouter(swapRouter).exactInputSingle(params);
@@ -105,7 +107,8 @@ contract SingleSwapExample {
     address tokenOut,
     uint256 amountIn,
     uint24 poolFee1,
-    uint24 poolFee2
+    uint24 poolFee2,
+    uint256 amountOutMinimum
   ) external returns (uint256 amountOut) {
     // Transfer `amountIn` of DAI to this contract.
     TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(this), amountIn);
@@ -122,7 +125,7 @@ contract SingleSwapExample {
       recipient: msg.sender,
       deadline: block.timestamp,
       amountIn: amountIn,
-      amountOutMinimum: 0
+      amountOutMinimum: amountOutMinimum
     });
 
     // Executes the swap.

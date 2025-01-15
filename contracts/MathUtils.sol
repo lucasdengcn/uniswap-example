@@ -146,4 +146,10 @@ library MathUtils {
     uint256 denominator = 10 ** (decimal1 - decimal0);
     price0 = SafeMath.div(denominator, numerator); // token0/token1
   }
+
+  function sqrtPriceX96ToUint(uint160 sqrtPriceX96, uint8 decimalsToken0) internal pure returns (uint256) {
+    uint256 numerator1 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
+    uint256 numerator2 = 10 ** decimalsToken0;
+    return FullMath.mulDiv(numerator1, numerator2, 1 << 192);
+  }
 }

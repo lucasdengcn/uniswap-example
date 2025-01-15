@@ -56,11 +56,11 @@ describe('TwapExample', function () {
   });
   describe('USDT_USDC_030 pool', function () {
     const fee = 3000;
-    it('Should estimate amountOut given USDC_OUT', async () => {
+    it('Should estimate amountOut given 1s USDT, USDC_OUT', async () => {
       const tokenIn = CS.TETHER_ADDRESS;
       const tokenOut = CS.USDC_ADDRESS;
-      const amountIn = ethers.parseEther('1');
-      const amountOut = await twapExample.estimateAmountOut(tokenIn, tokenOut, fee, amountIn, 10);
+      const amountIn = ethers.parseEther('10');
+      const amountOut = await twapExample.estimateAmountOut(tokenIn, tokenOut, fee, amountIn, 1);
       console.log('USDT_USDC_030 USDC amountOut: ', ethers.formatEther(amountOut));
     });
     it('Should estimate amountOut given USDT_OUT', async () => {
@@ -70,7 +70,7 @@ describe('TwapExample', function () {
       const amountOut = await twapExample.estimateAmountOut(tokenIn, tokenOut, fee, amountIn, 10);
       console.log('USDT_USDC_030 USDT amountOut: ', ethers.formatEther(amountOut));
     });
-    it('Should estimateV2 amountOut for USDT/USDEC given USDC_OUT', async () => {
+    it('Should estimateV2 amountOut given USDC_OUT', async () => {
       const tokenIn = CS.TETHER_ADDRESS;
       const tokenOut = CS.USDC_ADDRESS;
       const amountIn = ethers.parseEther('1');
@@ -87,11 +87,11 @@ describe('TwapExample', function () {
   });
   describe('USDT_USDC_100 pool', function () {
     const fee = 10000;
-    it('Should estimate amountOut given USDC_OUT', async () => {
+    it('Should estimate amountOut given 1s USDC_OUT', async () => {
       const tokenIn = CS.TETHER_ADDRESS;
       const tokenOut = CS.USDC_ADDRESS;
       const amountIn = ethers.parseEther('1');
-      const amountOut = await twapExample.estimateAmountOut(tokenIn, tokenOut, fee, amountIn, 10);
+      const amountOut = await twapExample.estimateAmountOutV2(tokenIn, tokenOut, fee, amountIn, 1);
       console.log('USDT_USDC_100 USDC amountOut: ', ethers.formatEther(amountOut));
     });
     it('Should estimate amountOut given USDT_OUT', async () => {
@@ -112,8 +112,10 @@ describe('TwapExample', function () {
     it('Should TWAP for USDT/USDC given 10s', async () => {
       const tokenIn = CS.TETHER_ADDRESS;
       const tokenOut = CS.USDC_ADDRESS;
-      const sqrtPriceX96 = await twapExample.twapSqrtPriceX96(tokenIn, tokenOut, fee, 10);
+      const [sqrtPriceX96, token0, token1] = await twapExample.twapSqrtPriceX96(tokenIn, tokenOut, fee, 10);
       console.log('USDT_USDC_100 USDC sqrtPriceX96: ', sqrtPriceX96, CS.sqrtToPrice(sqrtPriceX96, 0));
+      console.log('USDT token0: ', token0, token0 == CS.TETHER_ADDRESS);
+      console.log('USDC token1: ', token1, token1 == CS.USDC_ADDRESS);
     });
   });
 });

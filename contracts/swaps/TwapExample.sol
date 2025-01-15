@@ -22,7 +22,7 @@ contract TwapExample is PeripheryImmutableState, PeripheryPayments {
 
   constructor(address _factory, address _WETH9) PeripheryImmutableState(_factory, _WETH9) {}
 
-  //
+  // estimate amountOut based on latest TWAP
   function estimateAmountOut(
     address tokenIn,
     address tokenOut,
@@ -37,7 +37,7 @@ contract TwapExample is PeripheryImmutableState, PeripheryPayments {
     amountOut = OracleLibrary.getQuoteAtTick(tick, amountIn, tokenIn, tokenOut);
   }
 
-  //
+  // estimate amountOut based on latest TWAP
   function estimateAmountOutV2(
     address tokenIn,
     address tokenOut,
@@ -63,16 +63,19 @@ contract TwapExample is PeripheryImmutableState, PeripheryPayments {
     amountOut = OracleLibrary.getQuoteAtTick(averageTick, amountIn, tokenIn, tokenOut);
   }
 
-  //
+  // calculate TWAP in secondsAgo
   function twapSqrtPriceX96(
     address tokenIn,
     address tokenOut,
     uint24 fee,
     uint24 secondsAgo
-  ) external view returns (uint160 sqrtPriceX96) {
+  ) external view returns (uint160 sqrtPriceX96, address token0, address token1) {
     //
     PoolAddress.PoolKey memory poolKey = PoolAddress.getPoolKey(tokenIn, tokenOut, fee);
     IUniswapV3Pool pool = IUniswapV3Pool(PoolAddress.computeAddress(factory, poolKey));
+    //
+    token0 = pool.token0();
+    token1 = pool.token1();
     //
     uint32[] memory secondsAgos = new uint32[](2);
     secondsAgos[0] = secondsAgo;
