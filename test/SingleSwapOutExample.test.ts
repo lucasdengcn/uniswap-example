@@ -7,8 +7,8 @@ import { expect } from 'chai';
 import { Signer } from 'ethers';
 import { ethers, ignition } from 'hardhat';
 
+import EstimationExampleModule from '../ignition/modules/EstimationExampleModule';
 import SingleSwapExampleModule from '../ignition/modules/SingleSwapExampleModule';
-import TwapExampleModule from '../ignition/modules/TwapExampleModule';
 
 describe('SingleSwapOutExampleModule', function () {
   let deployer: Signer;
@@ -48,9 +48,9 @@ describe('SingleSwapOutExampleModule', function () {
   }
 
   async function deployTwapContract() {
-    const { contract } = await ignition.deploy(TwapExampleModule, {
+    const { contract } = await ignition.deploy(EstimationExampleModule, {
       parameters: {
-        TwapExampleModule: {
+        EstimationExampleModule: {
           factoryAddress: CS.FACTORY_ADDRESS,
           weth9Address: CS.WETH_ADDRESS,
         },

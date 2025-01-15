@@ -8,8 +8,8 @@ import { Signer } from 'ethers';
 import { ethers, ignition } from 'hardhat';
 
 import BigNumber from 'bignumber.js';
+import EstimationExampleModule from '../ignition/modules/EstimationExampleModule';
 import SingleSwapExampleModule from '../ignition/modules/SingleSwapExampleModule';
-import TwapExampleModule from '../ignition/modules/TwapExampleModule';
 
 describe('SingleSwapInExample', function () {
   let deployer: Signer;
@@ -49,9 +49,9 @@ describe('SingleSwapInExample', function () {
   }
 
   async function deployTwapContract() {
-    const { contract } = await ignition.deploy(TwapExampleModule, {
+    const { contract } = await ignition.deploy(EstimationExampleModule, {
       parameters: {
-        TwapExampleModule: {
+        EstimationExampleModule: {
           factoryAddress: CS.FACTORY_ADDRESS,
           weth9Address: CS.WETH_ADDRESS,
         },
@@ -144,26 +144,38 @@ describe('SingleSwapInExample', function () {
 
   it('Should swap 10 USDT to USDC success given priceLimit', async function () {
     const requestId = CS.randomHexString(16);
-    const amountIn = ethers.parseEther('10');
+    const amount = ethers.parseEther('10');
     const callerAddress = await example.getAddress();
     const ownerAddress = await tokenOwner.getAddress();
     //
     totalUSDT = await usdt.balanceOf(tokenOwner);
     totalUSDC = await usdc.balanceOf(tokenOwner);
+    const fee = 3000;
     //
     const tether: any = await CS.getUSDT();
     // approve allowance (owner->contract)
-    await expect(tether.connect(tokenOwner).approve(callerAddress, amountIn))
+    await expect(tether.connect(tokenOwner).approve(callerAddress, amount))
       .to.be.emit(tether, 'Approval')
-      .withArgs(ownerAddress, callerAddress, amountIn);
+      .withArgs(ownerAddress, callerAddress, amount);
     // tx (usdt->contract->weth)
-    const priceLimit = await calculatePriceLimit(1);
+    const [priceLimit, currentPrice] = await twapExample.estimatePriceOnSwapExactInput(
+      CS.TETHER_ADDRESS,
+      CS.USDC_ADDRESS,
+      fee,
+      amount,
+      true
+    );
+    console.log('currentPrice: ', currentPrice);
+    console.log('priceLimit: ', priceLimit);
     // given priceLimit, amountIn will not be fully utilized
     const tx = await example
       .connect(tokenOwner)
-      .swapExactInputSingle(CS.TETHER_ADDRESS, CS.USDC_ADDRESS, amountIn, 3000, 0, priceLimit);
+      .swapExactInputSingle(CS.TETHER_ADDRESS, CS.USDC_ADDRESS, amount, fee, 0, priceLimit);
     expect(tx).not.be.reverted;
     expect(tx).to.be.emit(example, 'SwapResult');
+    //
+    const [currentPrice1, liqudity] = await twapExample.currentPrice(CS.TETHER_ADDRESS, CS.USDC_ADDRESS, fee);
+    console.log('currentPrice1: ', currentPrice1);
   });
 
   it('Should swap 10 USDT to USDC success given no price and amount control', async function () {
