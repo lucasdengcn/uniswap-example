@@ -27,6 +27,7 @@ npx hardhat ignition deploy ./ignition/modules/Lock.ts
 - FlashSwap
 - Quoter and QuoterV2
 - TWAP price
+- Slippage protection
 
 ## Deployment
 
